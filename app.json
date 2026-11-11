@@ -13,14 +13,26 @@
       }
     },
     "android": {
-  "package": "com.hpirselim.tankerplan",
-  "versionCode": 1,
-  "edgeToEdgeEnabled": true
-},
+      "package": "com.hpirselim.tankerplan",
+      "versionCode": 1,
+      "edgeToEdgeEnabled": true
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "name": "TankerPlan",
+      "shortName": "TankerPlan",
+      "themeColor": "#111111",
+      "backgroundColor": "#111111",
+      "display": "standalone"
+    },
     "extra": {
       "eas": {
         "projectId": "36445de8-9870-4b28-8328-b25ab70f1deb"
       }
-    }
+    },
+    "plugins": [
+      "expo-router"
+    ]
   }
 }

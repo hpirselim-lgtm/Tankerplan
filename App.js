@@ -1646,3 +1646,27 @@ const styles = StyleSheet.create({
     marginVertical: 10,
   },
 });
+
+if (typeof document !== "undefined" && "serviceWorker" in navigator) {
+
+  const registerSW = () => {
+
+    navigator.serviceWorker.register("/sw.js")
+
+      .then(() => console.log("TankerPlan çevrimdışı hazır"))
+
+      .catch((error) => console.error("SW hatası:", error));
+
+  };
+
+  if (document.readyState === "complete") {
+
+    registerSW();
+
+  } else {
+
+    window.addEventListener("load", registerSW);
+
+  }
+
+}
