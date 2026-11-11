@@ -5,7 +5,20 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
-    "ios": { "supportsTablet": true },
-    "android": { "edgeToEdgeEnabled": true }
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.hpirselim.tankerplan",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "edgeToEdgeEnabled": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "36445de8-9870-4b28-8328-b25ab70f1deb"
+      }
+    }
   }
 }
