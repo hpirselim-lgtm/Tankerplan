@@ -556,29 +556,62 @@ export default function App() {
     setPlan(null);
   }
 
-  async function deleteVehicle(vehicle) {
-    Alert.alert(
-      "Araç silinsin mi?",
-      `${vehicle.plate} plakalı aracın kayıtlı göz bilgileri silinecek.`,
-      [
-        { text: "Vazgeç", style: "cancel" },
-        {
-          text: "Sil",
-          style: "destructive",
-          onPress: async () => {
-            const next = vehicles.filter(
-              (item) => item.id !== vehicle.id
-setVehicles(next);
-            await persistVehicles(next);
+async function deleteVehicle(vehicle) {
+  const confirmDelete = async () => {
+    try {
+      const next = vehicles.filter(
+        (item) => item.id !== vehicle.id
+      );
 
-            if (selectedPlate === vehicle.plate) {
-              newVehicle();
-            }
-          },
-        },
-      ]
-    );
+      setVehicles(next);
+      await persistVehicles(next);
+
+      if (selectedPlate === vehicle.plate) {
+        newVehicle();
+      }
+
+      if (typeof window !== "undefined") {
+        window.alert("Araç başarıyla silindi.");
+      }
+    } catch (error) {
+      console.error("Araç silme hatası:", error);
+      Alert.alert("Hata", "Araç silinemedi.");
+    }
+  };
+
+  if (typeof window !== "undefined") {
+    if (window.confirm(`${vehicle.plate} plakalı araç silinsin mi?`)) {
+      await confirmDelete();
+    }
+    return;
   }
+
+
+  Alert.alert(
+
+    "Araç silinsin mi?",
+
+    `${vehicle.plate} plakalı araç silinecek.`,
+
+    [
+
+      { text: "Vazgeç", style: "cancel" },
+
+      {
+
+        text: "Sil",
+
+        style: "destructive",
+
+        onPress: confirmDelete
+
+      }
+
+    ]
+
+  );
+
+}
 
   function addDealer() {
     if (!eyes.length) {

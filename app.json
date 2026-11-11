@@ -13,8 +13,10 @@
       }
     },
     "android": {
-      "edgeToEdgeEnabled": true
-    },
+  "package": "com.hpirselim.tankerplan",
+  "versionCode": 1,
+  "edgeToEdgeEnabled": true
+},
     "extra": {
       "eas": {
         "projectId": "36445de8-9870-4b28-8328-b25ab70f1deb"
