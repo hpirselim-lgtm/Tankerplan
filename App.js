@@ -1,280 +1,1616 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
-  Alert, Platform, SafeAreaView, ScrollView, StatusBar,
-  StyleSheet, Text, TextInput, TouchableOpacity, View
+  SafeAreaView,
+  ScrollView,
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
 } from "react-native";
-import * as Print from "expo-print";
-import * as Sharing from "expo-sharing";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const C = {
-  bg:"#081426", panel:"#11223D", panel2:"#172B49", line:"#2B4262",
-  text:"#F1F5FB", muted:"#A9B8CC", blue:"#3985F6",
-  green:"#27AE73", amber:"#D69A32", red:"#E36A6A", empty:"#50627C"
+const STORAGE_KEY = "TANKERPLAN_VEHICLES_V1";
+
+const CATALOG = {
+  Shell: ["V-Power Diesel", "V-Power Kurşunsuz 95"],
+  Opet: ["Ultra Force Motorin", "Ultra Force 95"],
+  TotalEnergies: [
+    "Excellium Motorin",
+    "Motorin",
+    "Excellium Kurşunsuz 95",
+  ],
+  Aytemiz: [
+    "Optimum",
+    "Motorin",
+    "95 Oktan Kurşunsuz Benzin",
+  ],
+  "Petrol Ofisi": [
+    "V/Max Diesel",
+    "V/Max Kurşunsuz 95",
+  ],
 };
-const fmt = n => Math.round(n).toLocaleString("tr-TR");
-const num = v => Math.max(0, Number(String(v ?? "").replace(",", ".")) || 0);
-const escapeHTML = s => String(s ?? "").replace(/[&<>"']/g, c =>
-  ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])
-);
 
-const initialEyes = () => Array.from({length:6}, (_,i)=>({id:`eye-${i+1}`,capacity:"5000"}));
-// Aytemiz ürün kataloğu: dizel Optimum + Motorin; benzin yalnızca 95 oktan.
-const initialProducts = () => [
-  {id:"p1",name:"Optimum",liters:"12000"},
-  {id:"p2",name:"Motorin",liters:"8000"},
-  {id:"p3",name:"95 Oktan Kurşunsuz Benzin",liters:"4000"}
-];
+const COMPANIES = Object.keys(CATALOG);
 
-function distribute(eyes, products) {
-  const free = eyes.map(e=>num(e.capacity));
-  const allocations = eyes.map(()=>null);
-  const leftovers = [];
-  let eyeIndex = 0;
+const PRODUCT_COLORS = {
+  "V-Power Diesel": "#2563EB",
+  "V-Power Kurşunsuz 95": "#DC2626",
+  "Ultra Force Motorin": "#0D9488",
+  "Ultra Force 95": "#EA580C",
+  "Excellium Motorin": "#7C3AED",
+  "Motorin": "#64748B",
+  "Excellium Kurşunsuz 95": "#DB2777",
+  "Optimum": "#16A34A",
+  "95 Oktan Kurşunsuz Benzin": "#D97706",
+  "V/Max Diesel": "#0891B2",
+  "V/Max Kurşunsuz 95": "#9333EA",
+};
 
-  products.forEach(product => {
-    let need = num(product.liters);
-    const name = product.name.trim() || "İsimsiz ürün";
-    while (need > 0 && eyeIndex < eyes.length) {
-      if (free[eyeIndex] <= 0) { eyeIndex++; continue; }
-      const amount = Math.min(need, free[eyeIndex]);
-      allocations[eyeIndex] = {name, liters:amount};
-      free[eyeIndex] -= amount;
-      need -= amount;
-      // Bir göze yalnızca tek ürün atanır; sonraki ürün sonraki gözden başlar.
-      eyeIndex++;
+const makeId = () =>
+  Date.now().toString() + Math.random().toString(36).slice(2, 7);
+
+const normalizePlate = (value) =>
+  value.toLocaleUpperCase("tr-TR").replace(/\s+/g, " ").trim();
+
+const parseLiters = (value) => {
+  const cleaned = String(value || "").replace(/[^\d]/g, "");
+  return Number(cleaned) || 0;
+};
+
+const formatLiters = (value) =>
+  Number(value || 0).toLocaleString("tr-TR");
+
+function makeDealer() {
+  return {
+    id: makeId(),
+    company: "Shell",
+    name: "",
+    products: CATALOG.Shell.map((product) => ({
+      name: product,
+      liters: "",
+    })),
+  };
+}
+
+function findBestCombination(eyes, demand) {
+  if (!eyes.length || demand <= 0) return null;
+
+  let best = null;
+  const totalMasks = 1 << eyes.length;
+
+  for (let mask = 1; mask < totalMasks; mask++) {
+    const selected = [];
+    let total = 0;
+
+    for (let i = 0; i < eyes.length; i++) {
+      if (mask & (1 << i)) {
+        selected.push(eyes[i]);
+        total += eyes[i].capacity;
+      }
     }
-    if (need > 0) leftovers.push({name,liters:need});
+
+    const exact = total === demand;
+    const enough = total >= demand;
+    const excess = Math.max(0, total - demand);
+
+    const candidate = {
+      selected,
+      total,
+      exact,
+      enough,
+      excess,
+    };
+
+    if (!best) {
+      best = candidate;
+      continue;
+    }
+
+    let better = false;
+
+    if (candidate.exact && !best.exact) {
+      better = true;
+    } else if (!candidate.exact && best.exact) {
+      better = false;
+    } else if (candidate.enough && !best.enough) {
+      better = true;
+    } else if (!candidate.enough && best.enough) {
+      better = false;
+    } else if (candidate.enough && best.enough) {
+      if (candidate.excess < best.excess) {
+        better = true;
+      } else if (
+        candidate.excess === best.excess &&
+        candidate.selected.length < best.selected.length
+      ) {
+        better = true;
+      } else if (
+        candidate.excess === best.excess &&
+        candidate.selected.length === best.selected.length &&
+        candidate.selected[0].number < best.selected[0].number
+      ) {
+        better = true;
+      }
+    } else {
+      if (candidate.total > best.total) {
+        better = true;
+      } else if (
+        candidate.total === best.total &&
+        candidate.selected.length < best.selected.length
+      ) {
+        better = true;
+      }
+    }
+
+    if (better) best = candidate;
+  }
+
+  return best;
+}
+
+function createLoadingPlan(eyes, dealers) {
+  const freeEyes = eyes
+    .filter((eye) => eye.capacity > 0)
+    .map((eye) => ({ ...eye }));
+
+  const tasks = [];
+
+  dealers.forEach((dealer, dealerIndex) => {
+    dealer.products.forEach((product, productIndex) => {
+      const liters = parseLiters(product.liters);
+
+      if (liters > 0) {
+        tasks.push({
+          id: `${dealer.id}-${productIndex}`,
+          dealer: dealer.name || `Bayi ${dealerIndex + 1}`,
+          company: dealer.company,
+          product: product.name,
+          demand: liters,
+          remaining: liters,
+          dealerIndex,
+          productIndex,
+          allocations: [],
+        });
+      }
+    });
   });
-  return {allocations,free,leftovers};
-}
 
-function productColor(name) {
-  const s = name.toLocaleLowerCase("tr-TR");
-  if (s.includes("optimum") || s.includes("motorin")) return C.amber;
-  if (s.includes("benzin")) return "#3999E8";
-  return C.green;
-}
+  const allocations = [];
+  let remainingEyes = [...freeEyes];
 
-function reportHTML(eyes, products, plan, capacity, demand) {
-  const productRows = products.map(p =>
-    `<tr><td>${escapeHTML(p.name || "İsimsiz ürün")}</td><td>${fmt(num(p.liters))} L</td></tr>`
-  ).join("");
-  const eyeRows = eyes.map((e,i) => {
-    const a = plan.allocations[i], cap = num(e.capacity), filled = a ? a.liters : 0;
-    return `<tr><td>Göz ${i+1}</td><td>${escapeHTML(a ? a.name : "Boş")}</td>
-      <td>${fmt(filled)} L</td><td>${fmt(cap)} L</td>
-      <td>${cap ? Math.round(filled/cap*100) : 0}%</td>
-      <td>${fmt(Math.max(0,cap-filled))} L</td></tr>`;
-  }).join("");
-  const warning = plan.leftovers.length
-    ? `<div class="warn"><b>Kapasite yetersiz</b><br>${plan.leftovers.map(x=>`${escapeHTML(x.name)}: ${fmt(x.liters)} L dağıtılamadı`).join("<br>")}</div>`
-    : `<div class="ok">Girilen ürün taleplerinin tamamı gözlere dağıtıldı.</div>`;
-  return `<!doctype html><html lang="tr"><head><meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1"><title>TankerPlan Yükleme Planı</title>
-  <style>
-  body{font-family:Arial,sans-serif;color:#172033;padding:22px}h1{color:#10284a;margin-bottom:3px}
-  .muted{color:#64748b}.cards{display:flex;gap:10px;margin:20px 0}
-  .card{flex:1;border:1px solid #cbd5e1;border-radius:8px;padding:12px}
-  table{width:100%;border-collapse:collapse;margin:12px 0 22px;font-size:12px}
-  th,td{border:1px solid #cbd5e1;padding:8px;text-align:left}th{background:#edf3fa}
-  .ok,.warn{padding:12px;margin-top:14px}.ok{background:#e7f7ed;border:1px solid #9bd4ad}
-  .warn{background:#fff4df;border:1px solid #e9c77c}.foot{font-size:10px;color:#64748b;line-height:1.5;margin-top:25px}
-  </style></head><body><h1>TankerPlan</h1>
-  <p class="muted">Akaryakıt Tankeri Yükleme Planı · ${new Date().toLocaleString("tr-TR")}</p>
-  <div class="cards"><div class="card"><b>Toplam kapasite</b><br>${fmt(capacity)} L</div>
-  <div class="card"><b>Ürün talebi</b><br>${fmt(demand)} L</div>
-  <div class="card"><b>Göz sayısı</b><br>${eyes.length}</div></div>
-  <h2>Ürün talepleri</h2><table><tr><th>Ürün</th><th>Talep</th></tr>${productRows}</table>
-  <h2>Göz bazında yükleme dağılımı</h2>
-  <table><tr><th>Göz</th><th>Ürün</th><th>Yüklenecek</th><th>Kapasite</th><th>Doluluk</th><th>Boş kapasite</th></tr>${eyeRows}</table>
-  ${warning}<p class="foot">Bu rapor planlama amaçlıdır. Gerçek yükleme öncesinde ürün uyumluluğu, tanker bölme yapısı, ağırlık limitleri, dolum prosedürleri ve güvenlik kontrolleri yetkili kişilerce doğrulanmalıdır.</p>
-  </body></html>`;
+  while (remainingEyes.length > 0) {
+    const activeTasks = tasks.filter(
+      (task) => task.remaining > 0
+    );
+
+    if (!activeTasks.length) break;
+
+    let bestTask = null;
+    let bestCombo = null;
+
+    activeTasks.forEach((task) => {
+      const combo = findBestCombination(
+        remainingEyes,
+        task.remaining
+      );
+
+      if (!combo) return;
+
+      if (!bestTask) {
+        bestTask = task;
+        bestCombo = combo;
+        return;
+      }
+
+      let better = false;
+
+      if (combo.exact && !bestCombo.exact) {
+        better = true;
+      } else if (!combo.exact && bestCombo.exact) {
+        better = false;
+      } else if (combo.enough && !bestCombo.enough) {
+        better = true;
+      } else if (!combo.enough && bestCombo.enough) {
+        better = false;
+      } else if (combo.enough && bestCombo.enough) {
+        if (combo.excess < bestCombo.excess) {
+          better = true;
+        } else if (
+          combo.excess === bestCombo.excess &&
+          combo.selected.length < bestCombo.selected.length
+        ) {
+          better = true;
+        } else if (
+          combo.excess === bestCombo.excess &&
+          combo.selected.length === bestCombo.selected.length &&
+          task.dealerIndex < bestTask.dealerIndex
+        ) {
+          better = true;
+        }
+      } else if (combo.total > bestCombo.total) {
+        better = true;
+      } else if (
+        combo.total === bestCombo.total &&
+        task.dealerIndex < bestTask.dealerIndex
+      ) {
+        better = true;
+      }
+
+      if (better) {
+        bestTask = task;
+        bestCombo = combo;
+      }
+    });
+
+    if (!bestTask || !bestCombo) break;
+
+    const selectedEyes = [...bestCombo.selected].sort(
+      (a, b) => a.number - b.number
+    );
+
+    const totalCapacity = selectedEyes.reduce(
+      (sum, eye) => sum + eye.capacity,
+      0
+    );
+
+    let partialEye = null;
+    let partialLiters = 0;
+
+    if (totalCapacity !== bestTask.remaining) {
+      const center = (eyes.length + 1) / 2;
+
+      const candidates = selectedEyes
+        .map((eye) => {
+          const otherCapacity = totalCapacity - eye.capacity;
+          const required = bestTask.remaining - otherCapacity;
+
+          return {
+            eye,
+            required,
+            distance: Math.abs(eye.number - center),
+          };
+        })
+        .filter(
+          (item) =>
+            item.required > 0 &&
+            item.required < item.eye.capacity
+        )
+        .sort((a, b) => {
+          if (a.distance !== b.distance) {
+            return a.distance - b.distance;
+          }
+          return a.eye.number - b.eye.number;
+        });
+
+      if (candidates.length > 0) {
+        partialEye = candidates[0].eye;
+        partialLiters = candidates[0].required;
+      } else {
+        // Uygun bir kısmi göz yoksa mevcut göz sırası korunur.
+        let remaining = bestTask.remaining;
+
+        selectedEyes.forEach((eye) => {
+          if (remaining <= 0) return;
+
+          const loaded = Math.min(eye.capacity, remaining);
+          remaining -= loaded;
+
+          const item = {
+            eyeNumber: eye.number,
+            capacity: eye.capacity,
+            loaded,
+            company: bestTask.company,
+            dealer: bestTask.dealer,
+            product: bestTask.product,
+            color:
+              PRODUCT_COLORS[bestTask.product] || "#64748B",
+          };
+
+          allocations.push(item);
+          bestTask.allocations.push(item);
+        });
+
+        bestTask.remaining = remaining;
+
+        const usedIds = new Set(
+          selectedEyes.map((eye) => eye.id)
+        );
+
+        remainingEyes = remainingEyes.filter(
+          (eye) => !usedIds.has(eye.id)
+        );
+
+        continue;
+      }
+    }
+
+    selectedEyes.forEach((eye) => {
+      const loaded =
+        partialEye && eye.id === partialEye.id
+          ? partialLiters
+          : eye.capacity;
+
+      const item = {
+        eyeNumber: eye.number,
+        capacity: eye.capacity,
+        loaded,
+        company: bestTask.company,
+        dealer: bestTask.dealer,
+        product: bestTask.product,
+        color:
+          PRODUCT_COLORS[bestTask.product] || "#64748B",
+      };
+
+      allocations.push(item);
+      bestTask.allocations.push(item);
+    });
+
+    bestTask.remaining = 0;
+
+    const usedIds = new Set(
+      selectedEyes.map((eye) => eye.id)
+    );
+
+    remainingEyes = remainingEyes.filter(
+      (eye) => !usedIds.has(eye.id)
+    );
+  }
+
+  const usedNumbers = new Set(
+    allocations.map((item) => item.eyeNumber)
+  );
+
+  const emptyEyes = eyes.filter(
+    (eye) => !usedNumbers.has(eye.number)
+  );
+
+  const totalDemand = tasks.reduce(
+    (sum, task) => sum + task.demand,
+    0
+  );
+
+  const totalLoaded = allocations.reduce(
+    (sum, item) => sum + item.loaded,
+    0
+  );
+
+  return {
+    tasks,
+    allocations: allocations.sort(
+      (a, b) => a.eyeNumber - b.eyeNumber
+    ),
+    emptyEyes,
+    totalDemand,
+    totalLoaded,
+    unallocated: totalDemand - totalLoaded,
+  };
 }
 
 export default function App() {
-  const [eyes,setEyes] = useState(initialEyes);
-  const [products,setProducts] = useState(initialProducts);
-  const [busy,setBusy] = useState(false);
-  const plan = useMemo(()=>distribute(eyes,products),[eyes,products]);
-  const capacity = eyes.reduce((s,e)=>s+num(e.capacity),0);
-  const demand = products.reduce((s,p)=>s+num(p.liters),0);
-  const allocated = plan.allocations.reduce((s,a)=>s+(a ? a.liters : 0),0);
-  const notAllocated = plan.leftovers.reduce((s,x)=>s+x.liters,0);
+  const [vehicles, setVehicles] = useState([]);
+  const [plate, setPlate] = useState("");
+  const [eyes, setEyes] = useState([]);
+  const [dealers, setDealers] = useState([]);
+  const [plan, setPlan] = useState(null);
+  const [selectedPlate, setSelectedPlate] = useState("");
+  const [loading, setLoading] = useState(true);
 
-  const changeEye = (id,value) => setEyes(old=>old.map(e=>e.id===id?{...e,capacity:value}:e));
-  const changeProduct = (id,key,value) => setProducts(old=>old.map(p=>p.id===id?{...p,[key]:value}:p));
+  useEffect(() => {
+    loadVehicles();
+  }, []);
 
-  const addEye = () => {
-    if (eyes.length < 16) setEyes(old=>[...old,{id:`eye-${Date.now()}`,capacity:"5000"}]);
-  };
-  const deleteEye = id => {
-    if (eyes.length <= 1) return Alert.alert("Bilgi","En az bir tanker gözü bulunmalıdır.");
-    setEyes(old=>old.filter(e=>e.id!==id));
-  };
-  const addProduct = () => setProducts(old=>[...old,{id:`p-${Date.now()}`,name:"",liters:""}]);
-  const reset = () => Alert.alert("Örnek veriler","Örnek bilgiler yüklensin mi?",[
-    {text:"Vazgeç",style:"cancel"},
-    {text:"Yükle",onPress:()=>{setEyes(initialEyes());setProducts(initialProducts());}}
-  ]);
-
-  async function makePDF() {
-    if (busy) return;
-    setBusy(true);
+  async function loadVehicles() {
     try {
-      const html = reportHTML(eyes,products,plan,capacity,demand);
-      if (Platform.OS === "web") {
-        await Print.printAsync({html});
-      } else {
-        const file = await Print.printToFileAsync({html,base64:false});
-        if (await Sharing.isAvailableAsync()) {
-          await Sharing.shareAsync(file.uri,{
-            mimeType:"application/pdf",
-            dialogTitle:"TankerPlan PDF raporunu kaydet veya paylaş",
-            UTI:"com.adobe.pdf"
-          });
-        } else {
-          Alert.alert("PDF hazır",file.uri);
-        }
-      }
-    } catch (e) {
-      Alert.alert("PDF oluşturulamadı",e?.message || "Lütfen yeniden deneyin.");
-    } finally { setBusy(false); }
+      const saved = await AsyncStorage.getItem(STORAGE_KEY);
+      if (saved) setVehicles(JSON.parse(saved));
+    } catch (error) {
+      Alert.alert("Hata", "Araç kayıtları okunamadı.");
+    } finally {
+      setLoading(false);
+    }
   }
 
-  async function printPlan() {
-    if (busy) return;
-    setBusy(true);
+  async function persistVehicles(nextVehicles) {
     try {
-      await Print.printAsync({html:reportHTML(eyes,products,plan,capacity,demand)});
-    } catch (e) {
-      Alert.alert("Yazdırma açılamadı",e?.message || "Lütfen yeniden deneyin.");
-    } finally { setBusy(false); }
+      await AsyncStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify(nextVehicles)
+      );
+      setVehicles(nextVehicles);
+      return true;
+    } catch (error) {
+      Alert.alert("Hata", "Kayıt telefon hafızasına yazılamadı.");
+      return false;
+    }
   }
+
+  function newVehicle() {
+    setPlate("");
+    setSelectedPlate("");
+    setEyes([]);
+    setDealers([]);
+    setPlan(null);
+  }
+
+  function addEye() {
+    if (eyes.length >= 16) {
+      Alert.alert(
+        "Bilgi",
+        "Bir tankere en fazla 16 göz eklenebilir."
+      );
+      return;
+    }
+
+    setEyes((previous) => [
+      ...previous,
+      {
+        id: makeId(),
+        number: previous.length + 1,
+        capacity: 0,
+        capacityText: "",
+      },
+    ]);
+
+    setPlan(null);
+  }
+
+  function updateEye(id, value) {
+    const capacity = parseLiters(value);
+
+    setEyes((previous) =>
+      previous.map((eye) =>
+        eye.id === id
+          ? { ...eye, capacity, capacityText: value }
+          : eye
+      )
+    );
+
+    setPlan(null);
+  }
+
+  function removeEye(id) {
+    setEyes((previous) =>
+      previous
+        .filter((eye) => eye.id !== id)
+        .map((eye, index) => ({
+          ...eye,
+          number: index + 1,
+        }))
+    );
+
+    setPlan(null);
+  }
+
+  async function saveVehicle() {
+    const normalized = normalizePlate(plate);
+
+    if (!normalized) {
+      Alert.alert("Eksik bilgi", "Araç plakası girin.");
+      return;
+    }
+
+    if (!eyes.length) {
+      Alert.alert("Eksik bilgi", "En az bir tanker gözü ekleyin.");
+      return;
+    }
+
+    if (eyes.some((eye) => eye.capacity <= 0)) {
+      Alert.alert(
+        "Eksik bilgi",
+        "Bütün gözlerin kapasitesini girin."
+      );
+      return;
+    }
+
+    const existing = vehicles.find(
+      (vehicle) => vehicle.plate === normalized
+    );
+
+    const record = {
+      id: existing?.id || makeId(),
+      plate: normalized,
+      eyes: eyes.map((eye, index) => ({
+        id: eye.id,
+        number: index + 1,
+        capacity: eye.capacity,
+        capacityText: String(eye.capacity),
+      })),
+      updatedAt: new Date().toISOString(),
+    };
+
+    const next = [
+      record,
+      ...vehicles.filter(
+        (vehicle) => vehicle.plate !== normalized
+      ),
+    ];
+
+    const success = await persistVehicles(next);
+
+    if (success) {
+      setPlate(normalized);
+      setSelectedPlate(normalized);
+
+      Alert.alert(
+        "Kaydedildi",
+        `${normalized} plakalı araç kaydedildi.`
+      );
+    }
+  }
+
+  function selectVehicle(vehicle) {
+    setPlate(vehicle.plate);
+    setSelectedPlate(vehicle.plate);
+
+    setEyes(
+      vehicle.eyes.map((eye, index) => ({
+        ...eye,
+        number: index + 1,
+        capacityText: String(eye.capacity),
+      }))
+    );
+
+    setDealers([]);
+    setPlan(null);
+  }
+
+  async function deleteVehicle(vehicle) {
+    Alert.alert(
+      "Araç silinsin mi?",
+      `${vehicle.plate} plakalı aracın kayıtlı göz bilgileri silinecek.`,
+      [
+        { text: "Vazgeç", style: "cancel" },
+        {
+          text: "Sil",
+          style: "destructive",
+          onPress: async () => {
+            const next = vehicles.filter(
+              (item) => item.id !== vehicle.id
+            );
+
+            await persistVehicles(next);
+
+            if (selectedPlate === vehicle.plate) {
+              newVehicle();
+            }
+          },
+        },
+      ]
+    );
+  }
+
+  function addDealer() {
+    if (!eyes.length) {
+      Alert.alert("Önce tanker gözlerini ekleyin.");
+      return;
+    }
+
+    if (dealers.length >= eyes.length) {
+      Alert.alert(
+        "Bayi sınırı",
+        "Bayi kartı sayısı tanker gözü sayısını geçemez."
+      );
+      return;
+    }
+
+    setDealers((previous) => [
+      ...previous,
+      makeDealer(),
+    ]);
+
+    setPlan(null);
+  }
+
+  function changeCompany(dealerId, company) {
+    setDealers((previous) =>
+      previous.map((dealer) =>
+        dealer.id === dealerId
+          ? {
+              ...dealer,
+              company,
+              products: CATALOG[company].map((product) => ({
+                name: product,
+                liters: "",
+              })),
+            }
+          : dealer
+      )
+    );
+
+    setPlan(null);
+  }
+
+  function updateDealerName(dealerId, name) {
+    setDealers((previous) =>
+      previous.map((dealer) =>
+        dealer.id === dealerId
+          ? { ...dealer, name }
+          : dealer
+      )
+    );
+
+    setPlan(null);
+  }
+
+  function updateProduct(dealerId, productName, liters) {
+    setDealers((previous) =>
+      previous.map((dealer) =>
+        dealer.id === dealerId
+          ? {
+              ...dealer,
+              products: dealer.products.map((product) =>
+                product.name === productName
+                  ? { ...product, liters }
+                  : product
+              ),
+            }
+          : dealer
+      )
+    );
+
+    setPlan(null);
+  }
+
+  function removeDealer(dealerId) {
+    setDealers((previous) =>
+      previous.filter((dealer) => dealer.id !== dealerId)
+    );
+
+    setPlan(null);
+  }
+
+  function calculatePlan() {
+    if (!eyes.length) {
+      Alert.alert("Eksik bilgi", "Tanker gözlerini ekleyin.");
+      return;
+    }
+
+    if (eyes.some((eye) => eye.capacity <= 0)) {
+      Alert.alert(
+        "Eksik bilgi",
+        "Göz kapasitelerini kontrol edin."
+      );
+      return;
+    }
+
+    const hasDemand = dealers.some((dealer) =>
+      dealer.products.some(
+        (product) => parseLiters(product.liters) > 0
+      )
+    );
+
+    if (!hasDemand) {
+      Alert.alert(
+        "Eksik bilgi",
+        "En az bir ürün için litre girin."
+      );
+      return;
+    }
+
+    setPlan(createLoadingPlan(eyes, dealers));
+  }
+
+  const totalCapacity = eyes.reduce(
+    (sum, eye) => sum + eye.capacity,
+    0
+  );
+
+  const usedProducts = plan
+    ? [...new Set(plan.allocations.map((item) => item.product))]
+    : [];
 
   return (
-    <SafeAreaView style={s.safe}>
-      <StatusBar barStyle="light-content" backgroundColor={C.bg}/>
-      <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
-        <View style={s.header}>
-          <View><Text style={s.brand}>Tanker<Text style={{color:"#66A7FF"}}>Plan</Text></Text>
-          <Text style={s.kicker}>AKARYAKIT TANKERİ YÜKLEME PLANLAYICI</Text></View>
-          <Text style={s.sdk}>SDK 58</Text>
+    <SafeAreaView style={styles.safe}>
+      <ScrollView contentContainerStyle={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.logo}>TANKERPLAN</Text>
+          <Text style={styles.subtitle}>
+            Akaryakıt Tankeri Yükleme Planlayıcı
+          </Text>
         </View>
 
-        <View style={s.stats}>
-          <View style={s.stat}><Text style={s.muted}>Toplam kapasite</Text><Text style={s.statValue}>{fmt(capacity)} L</Text></View>
-          <View style={s.stat}><Text style={s.muted}>Ürün talebi</Text><Text style={s.statValue}>{fmt(demand)} L</Text></View>
-        </View>
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>
+            1. Araç ve Plaka Kayıtları
+          </Text>
 
-        <View style={s.section}>
-          <View style={s.sectionHead}>
-            <View><Text style={s.heading}>1. Tanker gözleri</Text><Text style={s.helper}>{eyes.length} / 16 göz tanımlı</Text></View>
-            <TouchableOpacity disabled={eyes.length>=16} style={[s.btn,eyes.length>=16&&s.disabled]} onPress={addEye}><Text style={s.btnText}>＋ Göz ekle</Text></TouchableOpacity>
+          <Text style={styles.label}>Araç plakası</Text>
+          <TextInput
+            style={styles.input}
+            value={plate}
+            onChangeText={setPlate}
+            placeholder="Örn. 61 ABC 123"
+            autoCapitalize="characters"
+          />
+
+          <View style={styles.buttonRow}>
+            <TouchableOpacity
+              style={styles.primaryButton}
+              onPress={saveVehicle}
+            >
+              <Text style={styles.buttonText}>
+                Araç ve Gözleri Kaydet
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.grayButton}
+              onPress={newVehicle}
+            >
+              <Text style={styles.buttonText}>Yeni Araç</Text>
+            </TouchableOpacity>
           </View>
-          {eyes.map((eye,i)=><View style={s.eyeRow} key={eye.id}>
-            <Text style={s.eyeName}>Göz {i+1}</Text>
-            <TextInput style={[s.input,s.eyeInput]} value={eye.capacity} onChangeText={v=>changeEye(eye.id,v)} keyboardType="decimal-pad" placeholder="Kapasite L" placeholderTextColor={C.muted}/>
-            <Text style={s.unit}>L</Text>
-            <TouchableOpacity onPress={()=>deleteEye(eye.id)}><Text style={s.delete}>Sil</Text></TouchableOpacity>
-          </View>)}
+
+          <Text style={styles.label}>Kayıtlı araçlar</Text>
+
+          {loading ? (
+            <Text style={styles.muted}>
+              Kayıtlar yükleniyor...
+            </Text>
+          ) : vehicles.length === 0 ? (
+            <Text style={styles.muted}>
+              Henüz kayıtlı araç yok.
+            </Text>
+          ) : (
+            vehicles.map((vehicle) => (
+              <View key={vehicle.id} style={styles.vehicleRow}>
+                <TouchableOpacity
+                  style={styles.vehicleSelect}
+                  onPress={() => selectVehicle(vehicle)}
+                >
+                  <Text style={styles.vehiclePlate}>
+                    {vehicle.plate}
+                  </Text>
+
+                  <Text style={styles.muted}>
+                    {vehicle.eyes.length} göz ·{" "}
+                    {formatLiters(
+                      vehicle.eyes.reduce(
+                        (sum, eye) => sum + eye.capacity,
+                        0
+                      )
+                    )}{" "}
+                    litre
+                  </Text>
+
+                  {selectedPlate === vehicle.plate && (
+                    <Text style={styles.selectedText}>
+                      Seçili araç
+                    </Text>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.deleteButton}
+                  onPress={() => deleteVehicle(vehicle)}
+                >
+                  <Text style={styles.deleteText}>Sil</Text>
+                </TouchableOpacity>
+              </View>
+            ))
+          )}
         </View>
 
-        <View style={s.section}>
-          <View style={s.sectionHead}>
-            <View><Text style={s.heading}>2. Ürün ve litre talepleri</Text><Text style={s.helper}>Ürün adı ve istenen miktarı girin.</Text></View>
-            <TouchableOpacity style={s.btn} onPress={addProduct}><Text style={s.btnText}>＋ Ürün</Text></TouchableOpacity>
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>
+            2. Tanker Gözleri
+          </Text>
+
+          <Text style={styles.muted}>
+            Gözleri tek tek ekleyin ve her birinin litre
+            kapasitesini girin.
+          </Text>
+
+          {eyes.map((eye) => (
+            <View key={eye.id} style={styles.eyeInputRow}>
+              <View style={styles.eyeNumber}>
+                <Text style={styles.eyeNumberText}>
+                  {eye.number}. Göz
+                </Text>
+              </View>
+
+              <TextInput
+                style={styles.capacityInput}
+                value={eye.capacityText}
+                onChangeText={(value) =>
+                  updateEye(eye.id, value)
+                }
+                keyboardType="number-pad"
+                placeholder="Kapasite (L)"
+              />
+
+              <TouchableOpacity
+                style={styles.removeEyeButton}
+                onPress={() => removeEye(eye.id)}
+              >
+                <Text style={styles.deleteText}>×</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+
+          <TouchableOpacity
+            style={styles.outlineButton}
+            onPress={addEye}
+          >
+            <Text style={styles.outlineButtonText}>
+              + Yeni Göz Ekle
+            </Text>
+          </TouchableOpacity>
+
+          <View style={styles.totalBox}>
+            <Text style={styles.totalText}>
+              Toplam tanker kapasitesi:{" "}
+              {formatLiters(totalCapacity)} L
+            </Text>
           </View>
-          {products.map((p,i)=><View style={s.product} key={p.id}>
-            <View style={s.productHead}><Text style={s.productTitle}>Ürün {i+1}</Text><TouchableOpacity onPress={()=>setProducts(old=>old.filter(x=>x.id!==p.id))}><Text style={s.delete}>Ürünü sil</Text></TouchableOpacity></View>
-            <Text style={s.fieldLabel}>Ürün adı</Text>
-            <TextInput style={s.input} value={p.name} onChangeText={v=>changeProduct(p.id,"name",v)} placeholder="Örn. Motorin" placeholderTextColor={C.muted}/>
-            <Text style={s.fieldLabel}>Talep edilen litre</Text>
-            <TextInput style={s.input} value={p.liters} onChangeText={v=>changeProduct(p.id,"liters",v)} keyboardType="decimal-pad" placeholder="Örn. 12000" placeholderTextColor={C.muted}/>
-          </View>)}
+
+          <TouchableOpacity
+            style={styles.primaryButton}
+            onPress={saveVehicle}
+          >
+            <Text style={styles.buttonText}>
+              Göz Değişikliklerini Kaydet
+            </Text>
+          </TouchableOpacity>
         </View>
 
-        <View style={s.section}>
-          <View style={s.sectionHead}>
-            <View><Text style={s.heading}>3. Otomatik yük dağıtımı</Text><Text style={s.helper}>Her göze tek ürün atanır.</Text></View>
-            <TouchableOpacity style={s.secondary} onPress={reset}><Text style={s.btnText}>Örnek veriler</Text></TouchableOpacity>
-          </View>
-          <View style={s.tanker}>
-            <View style={s.tankerHead}><Text style={s.tankerTitle}>🚛 TANKER GÖRÜNÜMÜ</Text><Text style={s.helper}>{eyes.length} bölme</Text></View>
-            <View style={s.grid}>
-              {eyes.map((eye,i)=>{
-                const item=plan.allocations[i], cap=num(eye.capacity), filled=item?item.liters:0;
-                const pct=cap?Math.min(100,filled/cap*100):0;
-                return <View style={s.compartment} key={eye.id}>
-                  <View style={[s.fill,{height:`${pct}%`,backgroundColor:item?productColor(item.name):C.empty}]}/>
-                  <View style={s.compText}>
-                    <Text style={s.compNo}>GÖZ {i+1}</Text>
-                    <Text style={s.compProduct} numberOfLines={2}>{item?item.name:"Boş"}</Text>
-                    <Text style={s.compLiters}>{fmt(filled)} / {fmt(cap)} L</Text>
-                    <Text style={s.compPct}>{Math.round(pct)}%</Text>
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>
+            3. Bayi ve Ürün Talepleri
+          </Text>
+
+          <Text style={styles.muted}>
+            Her bayi için ayrı kart açın. Aynı dağıtım
+            şirketinden birden fazla bayi ekleyebilirsiniz.
+          </Text>
+
+          {dealers.map((dealer, index) => (
+            <View key={dealer.id} style={styles.dealerCard}>
+              <View style={styles.dealerHeader}>
+                <Text style={styles.dealerTitle}>
+                  Bayi {index + 1}
+                </Text>
+
+                <TouchableOpacity
+                  onPress={() => removeDealer(dealer.id)}
+                >
+                  <Text style={styles.deleteText}>Kartı Sil</Text>
+                </TouchableOpacity>
+              </View>
+
+              <Text style={styles.label}>
+                Dağıtım şirketi
+              </Text>
+
+              <View style={styles.companyList}>
+                {COMPANIES.map((company) => (
+                  <TouchableOpacity
+                    key={company}
+                    style={[
+                      styles.companyButton,
+                      dealer.company === company &&
+                        styles.companyButtonActive,
+                    ]}
+                    onPress={() =>
+                      changeCompany(dealer.id, company)
+                    }
+                  >
+                    <Text
+                      style={[
+                        styles.companyText,
+                        dealer.company === company &&
+                          styles.companyTextActive,
+                      ]}
+                    >
+                      {company}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={styles.label}>
+                Bayi adı / kodu
+              </Text>
+
+              <TextInput
+                style={styles.input}
+                value={dealer.name}
+                onChangeText={(value) =>
+                  updateDealerName(dealer.id, value)
+                }
+                placeholder="Bayi adı veya kodu"
+              />
+
+              <Text style={styles.label}>
+                Ürün talepleri (litre)
+              </Text>
+
+              {dealer.products.map((product) => (
+                <View
+                  key={product.name}
+                  style={styles.productRow}
+                >
+                  <View
+                    style={[
+                      styles.productColorDot,
+                      {
+                        backgroundColor:
+                          PRODUCT_COLORS[product.name] ||
+                          "#64748B",
+                      },
+                    ]}
+                  />
+
+                  <Text style={styles.productName}>
+                    {product.name}
+                  </Text>
+
+                  <TextInput
+                    style={styles.literInput}
+                    value={product.liters}
+                    onChangeText={(value) =>
+                      updateProduct(
+                        dealer.id,
+                        product.name,
+                        value
+                      )
+                    }
+                    keyboardType="number-pad"
+                    placeholder="Litre"
+                  />
+                </View>
+              ))}
+            </View>
+          ))}
+
+          <TouchableOpacity
+            style={styles.outlineButton}
+            onPress={addDealer}
+          >
+            <Text style={styles.outlineButtonText}>
+              + Yeni Bayi Ekle
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.calculateButton}
+            onPress={calculatePlan}
+          >
+            <Text style={styles.buttonText}>
+              YÜKLEME PLANINI OLUŞTUR
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {plan && (
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>
+              4. Yükleme Planı
+            </Text>
+
+            <View style={styles.summaryGrid}>
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryLabel}>
+                  Toplam talep
+                </Text>
+                <Text style={styles.summaryValue}>
+                  {formatLiters(plan.totalDemand)} L
+                </Text>
+              </View>
+
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryLabel}>
+                  Yüklenecek
+                </Text>
+                <Text style={styles.summaryValue}>
+                  {formatLiters(plan.totalLoaded)} L
+                </Text>
+              </View>
+
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryLabel}>
+                  Karşılanamayan
+                </Text>
+                <Text style={styles.summaryValue}>
+                  {formatLiters(plan.unallocated)} L
+                </Text>
+              </View>
+            </View>
+
+            <Text style={styles.subTitle}>
+              Ürün renk anahtarı
+            </Text>
+
+            <View style={styles.legendGrid}>
+              {usedProducts.map((product) => (
+                <View
+                  key={product}
+                  style={styles.legendItem}
+                >
+                  <View
+                    style={[
+                      styles.legendDot,
+                      {
+                        backgroundColor:
+                          PRODUCT_COLORS[product] ||
+                          "#64748B",
+                      },
+                    ]}
+                  />
+
+                  <Text style={styles.legendText}>
+                    {product}
+                  </Text>
+                </View>
+              ))}
+            </View>
+
+            <Text style={styles.subTitle}>
+              Tanker göz dolum şeması
+            </Text>
+
+            <View style={styles.tankGrid}>
+              {eyes.map((eye) => {
+                const allocation = plan.allocations.find(
+                  (item) => item.eyeNumber === eye.number
+                );
+
+                const percentage =
+                  allocation && eye.capacity > 0
+                    ? Math.min(
+                        100,
+                        (allocation.loaded / eye.capacity) * 100
+                      )
+                    : 0;
+
+                return (
+                  <View
+                    key={eye.id}
+                    style={styles.tankEye}
+                  >
+                    <Text style={styles.tankEyeTitle}>
+                      {eye.number}. Göz
+                    </Text>
+
+                    <View style={styles.tankOuter}>
+                      <View
+                        style={[
+                          styles.tankFill,
+                          {
+                            height: `${percentage}%`,
+                            backgroundColor: allocation
+                              ? allocation.color
+                              : "#dce3e8",
+                          },
+                        ]}
+                      />
+                    </View>
+
+                    <Text style={styles.tankLiters}>
+                      {formatLiters(
+                        allocation?.loaded || 0
+                      )}{" "}
+                      L
+                    </Text>
+
+                    <Text style={styles.tankCapacity}>
+                      / {formatLiters(eye.capacity)} L
+                    </Text>
+
+                    {allocation ? (
+                      <Text style={styles.tankProduct}>
+                        {allocation.product}
+                      </Text>
+                    ) : (
+                      <Text style={styles.emptyText}>
+                        Boş
+                      </Text>
+                    )}
                   </View>
-                </View>;
+                );
               })}
             </View>
-          </View>
-          <View style={s.summary}><Text style={s.muted}>Dağıtılan toplam</Text><Text style={s.summaryValue}>{fmt(allocated)} L</Text></View>
-          <View style={s.summary}><Text style={s.muted}>Dağıtılamayan toplam</Text><Text style={[s.summaryValue,notAllocated>0&&{color:C.red}]}>{fmt(notAllocated)} L</Text></View>
-          {plan.leftovers.length>0?<View style={s.warning}>
-            <Text style={s.warningTitle}>⚠ Tanker kapasitesi yetersiz</Text>
-            {plan.leftovers.map((x,i)=><Text style={s.warningText} key={i}>{x.name}: {fmt(x.liters)} L dağıtılamadı</Text>)}
-          </View>:<View style={s.success}><Text style={s.successText}>✓ Girilen ürün talepleri gözlere dağıtıldı.</Text></View>}
-        </View>
 
-        <View style={s.section}>
-          <Text style={s.heading}>4. Yazdırma ve PDF</Text>
-          <Text style={s.helper}>PDF raporunu oluşturun, iPhone'da Dosyalar'a kaydedin veya yazdırın.</Text>
-          <View style={s.exportRow}>
-            <TouchableOpacity disabled={busy} style={[s.btn,s.exportBtn,busy&&s.disabled]} onPress={makePDF}><Text style={s.btnText}>{busy?"Hazırlanıyor...":"PDF kaydet / paylaş"}</Text></TouchableOpacity>
-            <TouchableOpacity disabled={busy} style={[s.secondary,s.exportBtn,busy&&s.disabled]} onPress={printPlan}><Text style={s.btnText}>Yazdır</Text></TouchableOpacity>
-          </View>
-        </View>
+            <Text style={styles.subTitle}>
+              Göz bazında yükleme listesi
+            </Text>
 
-        <Text style={s.disclaimer}>Güvenlik notu: Bu uygulama planlama prototipidir. Gerçek yükleme öncesinde ürün uyumluluğu, tanker bölme yapısı, ağırlık limitleri, dolum prosedürleri ve güvenlik kontrolleri yetkili kişilerce ayrıca doğrulanmalıdır.</Text>
+            {plan.allocations.map((item) => (
+              <View
+                key={`allocation-${item.eyeNumber}`}
+                style={styles.resultRow}
+              >
+                <View
+                  style={[
+                    styles.resultEye,
+                    { backgroundColor: item.color },
+                  ]}
+                >
+                  <Text style={styles.resultEyeText}>
+                    {item.eyeNumber}. Göz
+                  </Text>
+                </View>
+
+                <View style={styles.resultDetails}>
+                  <Text style={styles.resultProduct}>
+                    {item.product}
+                  </Text>
+
+                  <Text style={styles.muted}>
+                    {item.company} · {item.dealer}
+                  </Text>
+
+                  <Text style={styles.resultLiters}>
+                    {formatLiters(item.loaded)} L /{" "}
+                    {formatLiters(item.capacity)} L
+                  </Text>
+                </View>
+              </View>
+            ))}
+
+            {plan.emptyEyes.length > 0 && (
+              <View style={styles.warningBox}>
+                <Text style={styles.warningTitle}>
+                  Boş kalan gözler
+                </Text>
+
+                <Text style={styles.warningText}>
+                  {plan.emptyEyes
+                    .map((eye) => `${eye.number}. Göz`)
+                    .join(", ")}
+                </Text>
+              </View>
+            )}
+
+            {plan.tasks.some(
+              (task) => task.remaining > 0
+            ) && (
+              <View style={styles.warningBox}>
+                <Text style={styles.warningTitle}>
+                  Karşılanamayan ürün talepleri
+                </Text>
+
+                {plan.tasks
+                  .filter((task) => task.remaining > 0)
+                  .map((task) => (
+                    <Text
+                      key={task.id}
+                      style={styles.warningText}
+                    >
+                      {task.dealer} · {task.product}:{" "}
+                      {formatLiters(task.remaining)} L eksik
+                    </Text>
+                  ))}
+              </View>
+            )}
+
+            <Text style={styles.note}>
+              Not: Her göz yalnızca tek ürün taşır. Renkler ürünleri
+              ayırt etmek içindir. Kısmi dolacak göz için mümkünse
+              tanker merkezine yakın göz tercih edilir. Yükleme
+              algoritması kapasite eşleşmesini önceliklendirir;
+              bütün ürünler için küresel optimum garantisi vermez.
+            </Text>
+          </View>
+        )}
+
+        <Text style={styles.footer}>
+          TANKERPLAN · Expo Go sürümü
+        </Text>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-const s=StyleSheet.create({
-  safe:{flex:1,backgroundColor:C.bg},content:{padding:15,paddingBottom:35},
-  header:{flexDirection:"row",justifyContent:"space-between",alignItems:"center",marginTop:8,marginBottom:18},
-  brand:{color:C.text,fontSize:30,fontWeight:"900",letterSpacing:-.8},
-  kicker:{color:"#8EAFD9",fontSize:9,letterSpacing:1,marginTop:3},
-  sdk:{color:"#C7DDFB",borderColor:"#42618B",borderWidth:1,borderRadius:20,paddingHorizontal:10,paddingVertical:7,fontSize:11,fontWeight:"700"},
-  stats:{flexDirection:"row",gap:9},stat:{flex:1,backgroundColor:C.panel,borderColor:C.line,borderWidth:1,borderRadius:13,padding:13},
-  muted:{color:C.muted,fontSize:12},statValue:{color:C.text,fontSize:19,fontWeight:"800",marginTop:6},
-  section:{backgroundColor:C.panel,borderColor:C.line,borderWidth:1,borderRadius:15,padding:13,marginTop:13},
-  sectionHead:{flexDirection:"row",justifyContent:"space-between",alignItems:"center",gap:8,marginBottom:11},
-  heading:{color:C.text,fontSize:16,fontWeight:"800"},helper:{color:C.muted,fontSize:11,marginTop:4,flexShrink:1},
-  btn:{backgroundColor:C.blue,borderRadius:9,paddingHorizontal:11,paddingVertical:10},
-  secondary:{backgroundColor:"#29415F",borderColor:"#3C587A",borderWidth:1,borderRadius:9,paddingHorizontal:11,paddingVertical:10},
-  btnText:{color:"#fff",fontSize:11,fontWeight:"800"},disabled:{opacity:.45},
-  eyeRow:{flexDirection:"row",alignItems:"center",gap:7,marginVertical:5},
-  eyeName:{width:48,color:C.text,fontWeight:"700",fontSize:12},
-  input:{backgroundColor:"#09182D",borderWidth:1,borderColor:"#344B6A",borderRadius:9,color:C.text,paddingHorizontal:10,paddingVertical:10,fontSize:14,minHeight:42},
-  eyeInput:{flex:1},unit:{color:C.muted,fontSize:11},delete:{color:"#F2A0A0",fontSize:11,fontWeight:"700",padding:5},
-  product:{backgroundColor:C.panel2,borderRadius:11,padding:10,marginTop:8},
-  productHead:{flexDirection:"row",justifyContent:"space-between",alignItems:"center",marginBottom:5},
-  productTitle:{color:C.text,fontWeight:"800",fontSize:13},fieldLabel:{color:C.muted,fontSize:11,marginTop:6,marginBottom:3},
-  tanker:{backgroundColor:"#09182D",borderWidth:1,borderColor:"#3B5272",borderRadius:17,padding:11,marginTop:9},
-  tankerHead:{flexDirection:"row",justifyContent:"space-between",alignItems:"center",marginBottom:11},
-  tankerTitle:{color:"#DDEBFC",fontSize:12,fontWeight:"900"},
-  grid:{flexDirection:"row",flexWrap:"wrap",justifyContent:"flex-start",gap:7},
-  compartment:{width:"31%",height:112,borderRadius:10,borderWidth:1,borderColor:"#536B8A",backgroundColor:"#142944",overflow:"hidden",justifyContent:"flex-end"},
-  fill:{position:"absolute",bottom:0,left:0,right:0,opacity:.86},
-  compText:{padding:6},compNo:{color:"#fff",fontSize:9,fontWeight:"900"},
-  compProduct:{color:"#fff",fontSize:10,fontWeight:"800",marginTop:4},
-  compLiters:{color:"#F0F5FC",fontSize:9,marginTop:3},compPct:{color:"#fff",fontSize:10,fontWeight:"900",marginTop:2},
-  summary:{flexDirection:"row",justifyContent:"space-between",alignItems:"center",marginTop:11},
-  summaryValue:{color:C.text,fontWeight:"800",fontSize:13},
-  warning:{backgroundColor:"#3B2A16",borderColor:"#8D652B",borderWidth:1,borderRadius:10,padding:11,marginTop:12},
-  warningTitle:{color:"#FFD58C",fontWeight:"900",marginBottom:5},warningText:{color:"#F8D9A4",fontSize:12,marginTop:3},
-  success:{backgroundColor:"#103524",borderColor:"#236B48",borderWidth:1,borderRadius:10,padding:11,marginTop:12},
-  successText:{color:"#A7F3C5",fontWeight:"700",fontSize:12},
-  exportRow:{flexDirection:"row",gap:9,marginTop:12},exportBtn:{flex:1,alignItems:"center"},
-  disclaimer:{color:"#91A5C0",fontSize:10,lineHeight:15,marginTop:15}
+const styles = StyleSheet.create({
+  safe: {
+    flex: 1,
+    backgroundColor: "#eef2f5",
+  },
+  container: {
+    padding: 14,
+    paddingBottom: 40,
+  },
+  header: {
+    backgroundColor: "#102d45",
+    padding: 22,
+    borderRadius: 16,
+    marginBottom: 14,
+  },
+  logo: {
+    color: "#ffffff",
+    fontSize: 27,
+    fontWeight: "900",
+    letterSpacing: 2,
+  },
+  subtitle: {
+    color: "#c6d6e2",
+    marginTop: 5,
+    fontSize: 13,
+  },
+  card: {
+    backgroundColor: "#ffffff",
+    padding: 15,
+    borderRadius: 14,
+    marginBottom: 14,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#17364d",
+    marginBottom: 12,
+  },
+  subTitle: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#17364d",
+    marginTop: 18,
+    marginBottom: 10,
+  },
+  label: {
+    color: "#536574",
+    fontSize: 13,
+    fontWeight: "700",
+    marginTop: 10,
+    marginBottom: 6,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#d5dfe6",
+    borderRadius: 9,
+    padding: 12,
+    fontSize: 15,
+    color: "#172b3a",
+    backgroundColor: "#fbfcfd",
+  },
+  buttonRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 12,
+    marginBottom: 10,
+  },
+  primaryButton: {
+    flex: 1,
+    backgroundColor: "#147b57",
+    padding: 13,
+    borderRadius: 9,
+    alignItems: "center",
+    marginTop: 10,
+  },
+  grayButton: {
+    backgroundColor: "#647684",
+    padding: 13,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 10,
+  },
+  buttonText: {
+    color: "#ffffff",
+    fontWeight: "800",
+    fontSize: 13,
+    textAlign: "center",
+  },
+  muted: {
+    color: "#7b8b96",
+    fontSize: 12,
+    marginTop: 3,
+  },
+  vehicleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#e0e7ec",
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 8,
+  },
+  vehicleSelect: {
+    flex: 1,
+  },
+  vehiclePlate: {
+    color: "#18364d",
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  selectedText: {
+    color: "#147b57",
+    fontWeight: "800",
+    fontSize: 12,
+    marginTop: 3,
+  },
+  deleteButton: {
+    padding: 9,
+  },
+  deleteText: {
+    color: "#c0392b",
+    fontWeight: "800",
+  },
+  eyeInputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 9,
+  },
+  eyeNumber: {
+    width: 72,
+    backgroundColor: "#eaf0f4",
+    padding: 11,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  eyeNumberText: {
+    fontWeight: "800",
+    color: "#24445b",
+    fontSize: 12,
+  },
+  capacityInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#d5dfe6",
+    padding: 10,
+    borderRadius: 8,
+    fontSize: 14,
+  },
+  removeEyeButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  outlineButton: {
+    borderWidth: 1,
+    borderColor: "#147b57",
+    borderRadius: 9,
+    padding: 13,
+    alignItems: "center",
+    marginTop: 13,
+  },
+  outlineButtonText: {
+    color: "#147b57",
+    fontWeight: "800",
+  },
+  totalBox: {
+    backgroundColor: "#edf5f1",
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 12,
+  },
+  totalText: {
+    color: "#147b57",
+    fontWeight: "800",
+    textAlign: "center",
+  },
+  dealerCard: {
+    borderWidth: 1,
+    borderColor: "#dce5eb",
+    borderRadius: 11,
+    padding: 12,
+    marginTop: 12,
+  },
+  dealerHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  dealerTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#17364d",
+  },
+  companyList: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  companyButton: {
+    borderWidth: 1,
+    borderColor: "#d4dfe6",
+    borderRadius: 7,
+    paddingVertical: 8,
+    paddingHorizontal: 9,
+  },
+  companyButtonActive: {
+    backgroundColor: "#173e59",
+    borderColor: "#173e59",
+  },
+  companyText: {
+    color: "#526675",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  companyTextActive: {
+    color: "#ffffff",
+  },
+  productRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderBottomWidth: 1,
+    borderBottomColor: "#edf1f4",
+    paddingVertical: 9,
+    gap: 8,
+  },
+  productColorDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+  },
+  productName: {
+    flex: 1,
+    color: "#334c5d",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  literInput: {
+    width: 95,
+    borderWidth: 1,
+    borderColor: "#d5dfe6",
+    borderRadius: 7,
+    padding: 9,
+    textAlign: "right",
+    fontSize: 14,
+  },
+  calculateButton: {
+    backgroundColor: "#173e59",
+    borderRadius: 10,
+    padding: 16,
+    alignItems: "center",
+    marginTop: 16,
+  },
+  summaryGrid: {
+    flexDirection: "row",
+    gap: 7,
+  },
+  summaryItem: {
+    flex: 1,
+    backgroundColor: "#edf2f5",
+    borderRadius: 9,
+    padding: 9,
+  },
+  summaryLabel: {
+    color: "#647684",
+    fontSize: 10,
+    fontWeight: "700",
+  },
+  summaryValue: {
+    color: "#17364d",
+    fontSize: 14,
+    fontWeight: "900",
+    marginTop: 5,
+  },
+  legendGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  legendItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    width: "47%",
+    gap: 6,
+  },
+  legendDot: {
+    width: 13,
+    height: 13,
+    borderRadius: 7,
+  },
+  legendText: {
+    flex: 1,
+    color: "#435967",
+    fontSize: 11,
+  },
+  tankGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 9,
+  },
+  tankEye: {
+    width: "22%",
+    minWidth: 72,
+    alignItems: "center",
+    backgroundColor: "#f4f7f9",
+    borderRadius: 9,
+    padding: 7,
+  },
+  tankEyeTitle: {
+    color: "#24445b",
+    fontSize: 11,
+    fontWeight: "800",
+    marginBottom: 6,
+  },
+  tankOuter: {
+    height: 82,
+    width: 38,
+    borderWidth: 2,
+    borderColor: "#9aabb7",
+    borderRadius: 8,
+    overflow: "hidden",
+    justifyContent: "flex-end",
+    backgroundColor: "#ffffff",
+  },
+  tankFill: {
+    width: "100%",
+  },
+  tankLiters: {
+    fontSize: 11,
+    color: "#17364d",
+    fontWeight: "800",
+    marginTop: 6,
+  },
+  tankCapacity: {
+    color: "#71818c",
+    fontSize: 9,
+  },
+  tankProduct: {
+    color: "#334c5d",
+    fontSize: 9,
+    textAlign: "center",
+    marginTop: 4,
+  },
+  emptyText: {
+    color: "#8a969e",
+    fontSize: 10,
+    marginTop: 4,
+  },
+  resultRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderBottomWidth: 1,
+    borderBottomColor: "#edf1f4",
+    paddingVertical: 10,
+    gap: 10,
+  },
+  resultEye: {
+    width: 65,
+    borderRadius: 7,
+    padding: 9,
+  },
+  resultEyeText: {
+    color: "#ffffff",
+    fontWeight: "800",
+    fontSize: 11,
+    textAlign: "center",
+  },
+  resultDetails: {
+    flex: 1,
+  },
+  resultProduct: {
+    color: "#17364d",
+    fontWeight: "800",
+    fontSize: 13,
+  },
+  resultLiters: {
+    color: "#147b57",
+    fontWeight: "800",
+    marginTop: 4,
+    fontSize: 12,
+  },
+  warningBox: {
+    backgroundColor: "#fff5e8",
+    borderRadius: 9,
+    padding: 12,
+    marginTop: 12,
+  },
+  warningTitle: {
+    color: "#a65c12",
+    fontWeight: "800",
+    marginBottom: 5,
+  },
+  warningText: {
+    color: "#86551e",
+    fontSize: 12,
+    marginTop: 3,
+  },
+  note: {
+    color: "#788894",
+    fontSize: 11,
+    lineHeight: 17,
+    marginTop: 14,
+  },
+  footer: {
+    textAlign: "center",
+    color: "#8796a0",
+    fontSize: 11,
+    marginVertical: 10,
+  },
 });
