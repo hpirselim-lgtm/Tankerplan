@@ -568,8 +568,7 @@ export default function App() {
           onPress: async () => {
             const next = vehicles.filter(
               (item) => item.id !== vehicle.id
-            );
-
+setVehicles(next);
             await persistVehicles(next);
 
             if (selectedPlate === vehicle.plate) {
