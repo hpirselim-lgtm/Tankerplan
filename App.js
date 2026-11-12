@@ -59,6 +59,8 @@ const makeId = () =>
 const normalizePlate = (value) =>
   value.toLocaleUpperCase("tr-TR").replace(/\s+/g, " ").trim();
 
+const parseWeightKg = (value) => Number(String(value || "").replace(/\./g, "").replace(",", ".")) || 0;
+
 const parseLiters = (value) => {
   const cleaned = String(value || "").replace(/[^\d]/g, "");
   return Number(cleaned) || 0;
@@ -520,8 +522,8 @@ export default function App() {
       return;
     }
 
-    const tareWeightKg = Number(String(tareWeightText).replace(/\\./g, "").replace(",", ".")) || 0;
-    const maxGrossWeightKg = Number(String(maxGrossWeightText).replace(/\\./g, "").replace(",", ".")) || 0;
+    const tareWeightKg = parseWeightKg(tareWeightText);
+    const maxGrossWeightKg = parseWeightKg(maxGrossWeightText);
     if (tareWeightKg <= 0 || maxGrossWeightKg <= tareWeightKg) {
       Alert.alert("Eksik bilgi", "Boş ağırlığı ve ruhsattaki azami yüklü ağırlığı doğru girin.");
       return;
@@ -837,8 +839,8 @@ async function deleteVehicle(vehicle) {
             onChangeText={setMaxGrossWeightText} keyboardType="decimal-pad"
             placeholder="Ruhsattaki azami yüklü ağırlık" />
           <Text style={styles.muted}>
-            Kullanılabilir ürün yükü: {maxGrossWeightText && tareWeightText && maxGrossWeightKg > tareWeightKg
-              ? formatLiters(maxGrossWeightKg - tareWeightKg) + " kg"
+            Kullanılabilir ürün yükü: {maxGrossWeightText && tareWeightText && parseWeightKg(maxGrossWeightText) > parseWeightKg(tareWeightText)
+              ? formatLiters(parseWeightKg(maxGrossWeightText) - parseWeightKg(tareWeightText)) + " kg"
               : "Ağırlık bilgilerini girin"}
           </Text>
 
