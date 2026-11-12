@@ -1164,6 +1164,30 @@ async function deleteVehicle(vehicle) {
               <Text style={styles.massSummaryText}>
                 Tahmini toplam ürün ağırlığı: {formatLiters(Math.round(plan.totalMassKg))} kg
               </Text>
+              {parseWeightKg(tareWeightText) > 0 &&
+              parseWeightKg(maxGrossWeightText) > parseWeightKg(tareWeightText) ? (
+                <>
+                  <Text style={styles.massSummaryText}>
+                    Kullanılabilir ürün yükü: {formatLiters(parseWeightKg(maxGrossWeightText) - parseWeightKg(tareWeightText))} kg
+                  </Text>
+                  {plan.totalMassKg > parseWeightKg(maxGrossWeightText) - parseWeightKg(tareWeightText) ? (
+                    <Text style={[styles.massSummaryText, { color: "#B91C1C", fontWeight: "bold" }]}>
+                      UYARI: Tahmini ürün ağırlığı aracın kullanılabilir yük kapasitesini {formatLiters(Math.ceil(plan.totalMassKg - (parseWeightKg(maxGrossWeightText) - parseWeightKg(tareWeightText)) ))} kg aşıyor.
+                    </Text>
+                  ) : (
+                    <Text style={[styles.massSummaryText, { color: "#166534" }]}>
+                      Ürün ağırlığı girilen yük kapasitesinin içinde görünüyor.
+                    </Text>
+                  )}
+                </>
+              ) : (
+                <Text style={styles.massSummaryText}>
+                  Yük kapasitesi kontrolü için boş ağırlık ve azami yüklü ağırlık bilgilerini girip aracı kaydedin.
+                </Text>
+              )}
+              <Text style={styles.muted}>
+                Kesafetler ortalama değerlerdir. Bu kontrol tahminidir; dingil yükü ve gerçek tartım ayrıca kontrol edilmelidir.
+              </Text>
             </View>
 
             <Text style={styles.subTitle}>
