@@ -24,8 +24,7 @@
       "shortName": "TankerPlan",
       "themeColor": "#111111",
       "backgroundColor": "#111111",
-      "display": "standalone",
-      "favicon": "./assets/tankerplan-logo.svg"
+      "display": "standalone"
     },
     "experiments": {
       "baseUrl": "/Tankerplan"
