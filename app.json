@@ -24,11 +24,12 @@
       "shortName": "TankerPlan",
       "themeColor": "#111111",
       "backgroundColor": "#111111",
-      "display": "standalone"
+      "display": "standalone",
+      "favicon": "./assets/tankerplan-logo.svg"
     },
     "experiments": {
-  "baseUrl": "/Tankerplan"
-},
+      "baseUrl": "/Tankerplan"
+    },
     "extra": {
       "eas": {
         "projectId": "36445de8-9870-4b28-8328-b25ab70f1deb"
