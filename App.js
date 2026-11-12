@@ -34,6 +34,11 @@ const CATALOG = {
 
 const COMPANIES = Object.keys(CATALOG);
 
+// Yaklaşık katalog kesafetleri (15°C referanslı, kg/m³).
+// Sevkiyata ait analiz/ölçüm belgesindeki değer esas alınmalıdır.
+const DEFAULT_DENSITY = (product) =>
+  /95|benzin|kurşunsuz/i.test(product) ? "750" : "835";
+
 const PRODUCT_COLORS = {
   "V-Power Diesel": "#2563EB",
   "V-Power Kurşunsuz 95": "#DC2626",
@@ -70,6 +75,7 @@ function makeDealer() {
     products: CATALOG.Shell.map((product) => ({
       name: product,
       liters: "",
+      densityKgM3: DEFAULT_DENSITY(product),
     })),
   };
 }
@@ -167,6 +173,7 @@ function createLoadingPlan(eyes, dealers) {
           dealer: dealer.name || `Bayi ${dealerIndex + 1}`,
           company: dealer.company,
           product: product.name,
+          densityKgM3: Number(product.densityKgM3) || Number(DEFAULT_DENSITY(product.name)),
           demand: liters,
           remaining: liters,
           dealerIndex,
@@ -304,6 +311,7 @@ function createLoadingPlan(eyes, dealers) {
             company: bestTask.company,
             dealer: bestTask.dealer,
             product: bestTask.product,
+            densityKgM3: bestTask.densityKgM3,
             color:
               PRODUCT_COLORS[bestTask.product] || "#64748B",
           };
@@ -339,6 +347,7 @@ function createLoadingPlan(eyes, dealers) {
         company: bestTask.company,
         dealer: bestTask.dealer,
         product: bestTask.product,
+        densityKgM3: bestTask.densityKgM3,
         color:
           PRODUCT_COLORS[bestTask.product] || "#64748B",
       };
@@ -376,6 +385,11 @@ function createLoadingPlan(eyes, dealers) {
     0
   );
 
+  const totalMassKg = allocations.reduce(
+    (sum, item) => sum + (item.loaded * item.densityKgM3) / 1000,
+    0
+  );
+
   return {
     tasks,
     allocations: allocations.sort(
@@ -384,6 +398,7 @@ function createLoadingPlan(eyes, dealers) {
     emptyEyes,
     totalDemand,
     totalLoaded,
+    totalMassKg,
     unallocated: totalDemand - totalLoaded,
   };
 }
@@ -645,6 +660,7 @@ async function deleteVehicle(vehicle) {
               products: CATALOG[company].map((product) => ({
                 name: product,
                 liters: "",
+                densityKgM3: DEFAULT_DENSITY(product),
               })),
             }
           : dealer
@@ -666,7 +682,7 @@ async function deleteVehicle(vehicle) {
     setPlan(null);
   }
 
-  function updateProduct(dealerId, productName, liters) {
+  function updateProduct(dealerId, productName, field, value) {
     setDealers((previous) =>
       previous.map((dealer) =>
         dealer.id === dealerId
@@ -674,7 +690,7 @@ async function deleteVehicle(vehicle) {
               ...dealer,
               products: dealer.products.map((product) =>
                 product.name === productName
-                  ? { ...product, liters }
+                  ? { ...product, [field]: value }
                   : product
               ),
             }
@@ -956,7 +972,10 @@ async function deleteVehicle(vehicle) {
               />
 
               <Text style={styles.label}>
-                Ürün talepleri (litre)
+                Ürün talepleri (litre) ve kesafet (kg/m³)
+              </Text>
+              <Text style={styles.densityNotice}>
+                Kesafet değerleri yaklaşık varsayılandır. Gerçek sevkiyatta analiz belgesi veya ölçüm sertifikasındaki değeri girin.
               </Text>
 
               {dealer.products.map((product) => (
@@ -975,9 +994,25 @@ async function deleteVehicle(vehicle) {
                     ]}
                   />
 
-                  <Text style={styles.productName}>
-                    {product.name}
-                  </Text>
+                  <View style={styles.productInfo}>
+                    <Text style={styles.productName}>
+                      {product.name}
+                    </Text>
+                    <TextInput
+                      style={styles.densityInput}
+                      value={String(product.densityKgM3 ?? DEFAULT_DENSITY(product.name))}
+                      onChangeText={(value) =>
+                        updateProduct(
+                          dealer.id,
+                          product.name,
+                          "densityKgM3",
+                          value.replace(/[^0-9.]/g, "")
+                        )
+                      }
+                      keyboardType="decimal-pad"
+                      placeholder="kg/m³"
+                    />
+                  </View>
 
                   <TextInput
                     style={styles.literInput}
@@ -986,6 +1021,7 @@ async function deleteVehicle(vehicle) {
                       updateProduct(
                         dealer.id,
                         product.name,
+                        "liters",
                         value
                       )
                     }
@@ -1049,6 +1085,12 @@ async function deleteVehicle(vehicle) {
                   {formatLiters(plan.unallocated)} L
                 </Text>
               </View>
+            </View>
+
+            <View style={styles.massSummary}>
+              <Text style={styles.massSummaryText}>
+                Tahmini toplam ürün ağırlığı: {formatLiters(Math.round(plan.totalMassKg))} kg
+              </Text>
             </View>
 
             <Text style={styles.subTitle}>
@@ -1175,8 +1217,10 @@ async function deleteVehicle(vehicle) {
                   </Text>
 
                   <Text style={styles.resultLiters}>
-                    {formatLiters(item.loaded)} L /{" "}
-                    {formatLiters(item.capacity)} L
+                    {formatLiters(item.loaded)} L / {formatLiters(item.capacity)} L
+                  </Text>
+                  <Text style={styles.muted}>
+                    Kesafet: {item.densityKgM3} kg/m³ · Yaklaşık ağırlık: {formatLiters(Math.round(item.loaded * item.densityKgM3 / 1000))} kg
                   </Text>
                 </View>
               </View>
@@ -1219,7 +1263,7 @@ async function deleteVehicle(vehicle) {
             )}
 
             <Text style={styles.note}>
-              Not: Her göz yalnızca tek ürün taşır. Renkler ürünleri
+              Not: Kesafet değerleri yaklaşık varsayılandır; ağırlık hesabı tahminidir. Gerçek sevkiyat için analiz belgesi/ölçüm sertifikasındaki değer kullanılmalıdır. Her göz yalnızca tek ürün taşır. Renkler ürünleri
               ayırt etmek içindir. Kısmi dolacak göz için mümkünse
               tanker merkezine yakın göz tercih edilir. Yükleme
               algoritması kapasite eşleşmesini önceliklendirir;
@@ -1467,11 +1511,44 @@ const styles = StyleSheet.create({
     height: 12,
     borderRadius: 6,
   },
+  productInfo: {
+    flex: 1,
+    gap: 5,
+  },
   productName: {
     flex: 1,
     color: "#334c5d",
     fontSize: 13,
     fontWeight: "600",
+  },
+  densityNotice: {
+    color: "#98621d",
+    backgroundColor: "#fff7e8",
+    borderRadius: 7,
+    padding: 8,
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 4,
+  },
+  densityInput: {
+    width: 88,
+    borderWidth: 1,
+    borderColor: "#d5dfe6",
+    borderRadius: 7,
+    padding: 7,
+    fontSize: 12,
+    color: "#334c5d",
+  },
+  massSummary: {
+    backgroundColor: "#edf5f1",
+    borderRadius: 9,
+    padding: 12,
+    marginTop: 12,
+  },
+  massSummaryText: {
+    color: "#147b57",
+    fontWeight: "800",
+    textAlign: "center",
   },
   literInput: {
     width: 95,
