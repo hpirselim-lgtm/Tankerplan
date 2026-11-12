@@ -19,7 +19,7 @@
     },
     "web": {
       "bundler": "metro",
-      "output": "static",
+      "output": "single",
       "name": "TankerPlan",
       "shortName": "TankerPlan",
       "themeColor": "#111111",
