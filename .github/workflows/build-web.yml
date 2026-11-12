@@ -1,0 +1,53 @@
+name: Build and publish TankerPlan web
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "App.js"
+      - "app.json"
+      - "package.json"
+      - "package-lock.json"
+      - "assets/**"
+      - ".github/workflows/build-web.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Export web app
+        run: npx expo export --platform web --output-dir dist
+
+      - name: Publish build to docs
+        run: |
+          rm -rf docs/*
+          cp -R dist/. docs/
+          touch docs/.nojekyll
+
+      - name: Commit published web build
+        run: |
+          if git diff --quiet -- docs; then
+            echo "No generated web changes."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs
+          git commit -m "Publish TankerPlan web build"
+          git push
