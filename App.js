@@ -415,6 +415,8 @@ export default function App() {
   const [eyes, setEyes] = useState([]);
   const [dealers, setDealers] = useState([]);
   const [plan, setPlan] = useState(null);
+  const [selectedCutTaskId, setSelectedCutTaskId] = useState("");
+  const [cutSummary, setCutSummary] = useState(null);
   const [selectedPlate, setSelectedPlate] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -768,7 +770,51 @@ async function deleteVehicle(vehicle) {
       return;
     }
 
+    setSelectedCutTaskId("");
+    setCutSummary(null);
     setPlan(createLoadingPlan(eyes, dealers));
+  }
+
+  function applyPayloadCut() {
+    const payloadKg = parseWeightKg(maxGrossWeightText) - parseWeightKg(tareWeightText);
+    if (payloadKg <= 0 || !plan || plan.totalMassKg <= payloadKg) return;
+    if (!selectedCutTaskId) {
+      Alert.alert("Ürün seçin", "Kesinti yapılacak ürünü seçin.");
+      return;
+    }
+
+    const selectedTask = plan.tasks.find((task) => task.id === selectedCutTaskId);
+    if (!selectedTask) return;
+    const dealerIndex = selectedTask.dealerIndex;
+    const productIndex = selectedTask.productIndex;
+    const density = Number(selectedTask.densityKgPerL) || Number(DEFAULT_DENSITY(selectedTask.product));
+    if (parseLiters(dealers[dealerIndex]?.products[productIndex]?.liters) <= 0 || density <= 0) return;
+
+    const nextDealers = dealers.map((dealer) => ({
+      ...dealer,
+      products: dealer.products.map((product) => ({ ...product })),
+    }));
+    let nextPlan = plan;
+    let totalCutLiters = 0;
+
+    // Yalnızca seçilen ürünü azalt; her adımda yükleme planını yeniden hesapla.
+    for (let attempt = 0; attempt < 20 && nextPlan.totalMassKg > payloadKg; attempt++) {
+      const excessKg = nextPlan.totalMassKg - payloadKg;
+      const availableLiters = parseLiters(nextDealers[dealerIndex].products[productIndex].liters);
+      const cutLiters = Math.min(availableLiters, Math.max(1, Math.ceil(excessKg / density)));
+      if (cutLiters <= 0) break;
+      nextDealers[dealerIndex].products[productIndex].liters = String(availableLiters - cutLiters);
+      totalCutLiters += cutLiters;
+      nextPlan = createLoadingPlan(eyes, nextDealers);
+    }
+
+    if (totalCutLiters <= 0) {
+      Alert.alert("Kesinti yapılamadı", "Seçilen üründen azaltılabilecek yük bulunamadı.");
+      return;
+    }
+    setDealers(nextDealers);
+    setPlan(nextPlan);
+    setCutSummary({ product: selectedTask.product, liters: totalCutLiters, withinLimit: nextPlan.totalMassKg <= payloadKg });
   }
 
   const totalCapacity = eyes.reduce(
@@ -1190,6 +1236,34 @@ async function deleteVehicle(vehicle) {
               </Text>
             </View>
 
+            {parseWeightKg(maxGrossWeightText) > parseWeightKg(tareWeightText) && plan.totalMassKg > parseWeightKg(maxGrossWeightText) - parseWeightKg(tareWeightText) && (
+              <View style={styles.warningBox}>
+                <Text style={styles.warningTitle}>Kesinti yapılacak ürünü seçin</Text>
+                <Text style={styles.warningText}>Yalnızca seçtiğiniz ürünün litre miktarı azaltılır; diğer ürünler korunur.</Text>
+                {plan.tasks.filter((task) => task.allocations.length > 0).map((task) => (
+                  <TouchableOpacity key={task.id}
+                    style={[styles.companyButton, selectedCutTaskId === task.id && styles.companyButtonActive, { marginTop: 7, alignSelf: "flex-start" }]}
+                    onPress={() => setSelectedCutTaskId(task.id)}>
+                    <Text style={[styles.companyText, selectedCutTaskId === task.id && styles.companyTextActive]}>
+                      {selectedCutTaskId === task.id ? "✓ " : ""}{task.product} · {task.dealer}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+                <TouchableOpacity style={styles.calculateButton} onPress={applyPayloadCut}>
+                  <Text style={styles.buttonText}>SEÇİLEN ÜRÜNDEN KESİNTİ YAP</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {cutSummary && (
+              <View style={cutSummary.withinLimit ? styles.massSummary : styles.warningBox}>
+                <Text style={cutSummary.withinLimit ? styles.massSummaryText : styles.warningTitle}>
+                  {cutSummary.product} ürününden {formatLiters(cutSummary.liters)} litre azaltıldı.
+                  {cutSummary.withinLimit ? " Araç yük sınırına uygun." : " Hâlâ kapasite aşımı var; aynı üründen tekrar kesinti uygulayabilirsiniz."}
+                </Text>
+              </View>
+            )}
+
             <Text style={styles.subTitle}>
               Ürün renk anahtarı
             </Text>
@@ -1370,7 +1444,7 @@ async function deleteVehicle(vehicle) {
         )}
 
         <Text style={styles.footer}>
-          TANKERPLAN · Expo Go sürümü
+          TANKERPLAN · Tasarım ve Geliştirme: Halim Pirselimoğlu
         </Text>
       </ScrollView>
     </SafeAreaView>
