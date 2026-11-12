@@ -830,7 +830,12 @@ async function deleteVehicle(vehicle) {
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.logo}>TANKERPLAN</Text>
+          <View style={styles.brandRow}>
+            <View style={styles.brandMark}>
+              <Text style={styles.brandDrop}>●</Text>
+            </View>
+            <Text style={styles.logo}>Tanker<Text style={styles.logoAccent}>Plan</Text></Text>
+          </View>
           <Text style={styles.subtitle}>
             Akaryakıt Tankeri Yükleme Planlayıcı
           </Text>
@@ -1466,11 +1471,35 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     marginBottom: 14,
   },
+  brandRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  brandMark: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: "#ffffff",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 3,
+    borderColor: "#e11d2e",
+  },
+  brandDrop: {
+    color: "#e11d2e",
+    fontSize: 25,
+    fontWeight: "900",
+    lineHeight: 29,
+  },
   logo: {
     color: "#ffffff",
     fontSize: 27,
     fontWeight: "900",
-    letterSpacing: 2,
+    letterSpacing: 0.2,
+  },
+  logoAccent: {
+    color: "#ef3340",
   },
   subtitle: {
     color: "#c6d6e2",
