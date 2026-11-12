@@ -406,6 +406,10 @@ function createLoadingPlan(eyes, dealers) {
 export default function App() {
   const [vehicles, setVehicles] = useState([]);
   const [plate, setPlate] = useState("");
+  const [trailerPlate, setTrailerPlate] = useState("");
+  const [vehicleType, setVehicleType] = useState("tractor_semitrailer");
+  const [tareWeightText, setTareWeightText] = useState("");
+  const [maxGrossWeightText, setMaxGrossWeightText] = useState("");
   const [eyes, setEyes] = useState([]);
   const [dealers, setDealers] = useState([]);
   const [plan, setPlan] = useState(null);
@@ -443,6 +447,10 @@ export default function App() {
 
   function newVehicle() {
     setPlate("");
+    setTrailerPlate("");
+    setVehicleType("tractor_semitrailer");
+    setTareWeightText("");
+    setMaxGrossWeightText("");
     setSelectedPlate("");
     setEyes([]);
     setDealers([]);
@@ -502,7 +510,20 @@ export default function App() {
     const normalized = normalizePlate(plate);
 
     if (!normalized) {
-      Alert.alert("Eksik bilgi", "Araç plakası girin.");
+      Alert.alert("Eksik bilgi", vehicleType === "tractor_semitrailer" ? "Çekici plakasını girin." : "Kamyon plakasını girin.");
+      return;
+    }
+
+    const normalizedTrailer = normalizePlate(trailerPlate);
+    if (vehicleType === "tractor_semitrailer" && !normalizedTrailer) {
+      Alert.alert("Eksik bilgi", "Yarı römork plakasını girin.");
+      return;
+    }
+
+    const tareWeightKg = Number(String(tareWeightText).replace(/\\./g, "").replace(",", ".")) || 0;
+    const maxGrossWeightKg = Number(String(maxGrossWeightText).replace(/\\./g, "").replace(",", ".")) || 0;
+    if (tareWeightKg <= 0 || maxGrossWeightKg <= tareWeightKg) {
+      Alert.alert("Eksik bilgi", "Boş ağırlığı ve ruhsattaki azami yüklü ağırlığı doğru girin.");
       return;
     }
 
@@ -526,6 +547,10 @@ export default function App() {
     const record = {
       id: existing?.id || makeId(),
       plate: normalized,
+      trailerPlate: vehicleType === "tractor_semitrailer" ? normalizedTrailer : "",
+      vehicleType,
+      tareWeightKg,
+      maxGrossWeightKg,
       eyes: eyes.map((eye, index) => ({
         id: eye.id,
         number: index + 1,
@@ -557,6 +582,10 @@ export default function App() {
 
   function selectVehicle(vehicle) {
     setPlate(vehicle.plate);
+    setTrailerPlate(vehicle.trailerPlate || "");
+    setVehicleType(vehicle.vehicleType || "tractor_semitrailer");
+    setTareWeightText(vehicle.tareWeightKg ? String(vehicle.tareWeightKg) : "");
+    setMaxGrossWeightText(vehicle.maxGrossWeightKg ? String(vehicle.maxGrossWeightKg) : "");
     setSelectedPlate(vehicle.plate);
 
     setEyes(
@@ -764,14 +793,54 @@ async function deleteVehicle(vehicle) {
             1. Araç ve Plaka Kayıtları
           </Text>
 
-          <Text style={styles.label}>Araç plakası</Text>
-          <TextInput
-            style={styles.input}
-            value={plate}
-            onChangeText={setPlate}
-            placeholder="Örn. 61 ABC 123"
-            autoCapitalize="characters"
-          />
+          <Text style={styles.label}>Araç cinsi</Text>
+          <View style={styles.companyList}>
+            {[
+              { value: "tractor_semitrailer", label: "Çekici + Yarı Römork Tanker" },
+              { value: "kamyon", label: "Kamyon / Kırkayak Tanker" },
+            ].map((item) => (
+              <TouchableOpacity
+                key={item.value}
+                style={[styles.companyButton, vehicleType === item.value && styles.companyButtonActive]}
+                onPress={() => setVehicleType(item.value)}
+              >
+                <Text style={[styles.companyText, vehicleType === item.value && styles.companyTextActive]}>
+                  {item.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {vehicleType === "tractor_semitrailer" ? (
+            <>
+              <Text style={styles.label}>Çekici plakası</Text>
+              <TextInput style={styles.input} value={plate} onChangeText={setPlate}
+                placeholder="Örn. 61 ABC 123" autoCapitalize="characters" />
+              <Text style={styles.label}>Yarı römork plakası</Text>
+              <TextInput style={styles.input} value={trailerPlate} onChangeText={setTrailerPlate}
+                placeholder="Örn. 61 D 4567" autoCapitalize="characters" />
+            </>
+          ) : (
+            <>
+              <Text style={styles.label}>Kamyon plakası</Text>
+              <TextInput style={styles.input} value={plate} onChangeText={setPlate}
+                placeholder="Örn. 61 ABC 123" autoCapitalize="characters" />
+            </>
+          )}
+
+          <Text style={styles.label}>Boş ağırlık (kg)</Text>
+          <TextInput style={styles.input} value={tareWeightText}
+            onChangeText={setTareWeightText} keyboardType="decimal-pad"
+            placeholder="Boş araç / kombinasyon ağırlığı" />
+          <Text style={styles.label}>Azami yüklü ağırlık (kg)</Text>
+          <TextInput style={styles.input} value={maxGrossWeightText}
+            onChangeText={setMaxGrossWeightText} keyboardType="decimal-pad"
+            placeholder="Ruhsattaki azami yüklü ağırlık" />
+          <Text style={styles.muted}>
+            Kullanılabilir ürün yükü: {maxGrossWeightText && tareWeightText && maxGrossWeightKg > tareWeightKg
+              ? formatLiters(maxGrossWeightKg - tareWeightKg) + " kg"
+              : "Ağırlık bilgilerini girin"}
+          </Text>
 
           <View style={styles.buttonRow}>
             <TouchableOpacity
@@ -809,7 +878,9 @@ async function deleteVehicle(vehicle) {
                   onPress={() => selectVehicle(vehicle)}
                 >
                   <Text style={styles.vehiclePlate}>
-                    {vehicle.plate}
+                    {vehicle.vehicleType === "tractor_semitrailer"
+                      ? `Çekici: ${vehicle.plate} · Yarı römork: ${vehicle.trailerPlate || "—"}`
+                      : `Kamyon: ${vehicle.plate}`}
                   </Text>
 
                   <Text style={styles.muted}>
