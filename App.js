@@ -34,10 +34,10 @@ const CATALOG = {
 
 const COMPANIES = Object.keys(CATALOG);
 
-// Yaklaşık katalog kesafetleri (15°C referanslı, kg/m³).
+// Yaklaşık litre kesafeti (kg/litre).
 // Sevkiyata ait analiz/ölçüm belgesindeki değer esas alınmalıdır.
 const DEFAULT_DENSITY = (product) =>
-  /95|benzin|kurşunsuz/i.test(product) ? "750" : "835";
+  /95|benzin|kurşunsuz/i.test(product) ? "0.750" : "0.835";
 
 const PRODUCT_COLORS = {
   "V-Power Diesel": "#2563EB",
@@ -77,7 +77,7 @@ function makeDealer() {
     products: CATALOG.Shell.map((product) => ({
       name: product,
       liters: "",
-      densityKgM3: DEFAULT_DENSITY(product),
+      densityKgPerL: DEFAULT_DENSITY(product),
     })),
   };
 }
@@ -175,7 +175,7 @@ function createLoadingPlan(eyes, dealers) {
           dealer: dealer.name || `Bayi ${dealerIndex + 1}`,
           company: dealer.company,
           product: product.name,
-          densityKgM3: Number(product.densityKgM3) || Number(DEFAULT_DENSITY(product.name)),
+          densityKgPerL: Number(String(product.densityKgPerL ?? "").replace(",", ".")) || Number(DEFAULT_DENSITY(product.name)),
           demand: liters,
           remaining: liters,
           dealerIndex,
@@ -313,7 +313,7 @@ function createLoadingPlan(eyes, dealers) {
             company: bestTask.company,
             dealer: bestTask.dealer,
             product: bestTask.product,
-            densityKgM3: bestTask.densityKgM3,
+            densityKgPerL: bestTask.densityKgPerL,
             color:
               PRODUCT_COLORS[bestTask.product] || "#64748B",
           };
@@ -349,7 +349,7 @@ function createLoadingPlan(eyes, dealers) {
         company: bestTask.company,
         dealer: bestTask.dealer,
         product: bestTask.product,
-        densityKgM3: bestTask.densityKgM3,
+        densityKgPerL: bestTask.densityKgPerL,
         color:
           PRODUCT_COLORS[bestTask.product] || "#64748B",
       };
@@ -388,7 +388,7 @@ function createLoadingPlan(eyes, dealers) {
   );
 
   const totalMassKg = allocations.reduce(
-    (sum, item) => sum + (item.loaded * item.densityKgM3) / 1000,
+    (sum, item) => sum + item.loaded * item.densityKgPerL,
     0
   );
 
@@ -691,7 +691,7 @@ async function deleteVehicle(vehicle) {
               products: CATALOG[company].map((product) => ({
                 name: product,
                 liters: "",
-                densityKgM3: DEFAULT_DENSITY(product),
+                densityKgPerL: DEFAULT_DENSITY(product),
               })),
             }
           : dealer
@@ -1045,7 +1045,7 @@ async function deleteVehicle(vehicle) {
               />
 
               <Text style={styles.label}>
-                Ürün talepleri (litre) ve kesafet (kg/m³)
+                Ürün talepleri (litre) ve litre kesafeti (kg/litre)
               </Text>
               <Text style={styles.densityNotice}>
                 Kesafet değerleri yaklaşık varsayılandır. Gerçek sevkiyatta analiz belgesi veya ölçüm sertifikasındaki değeri girin.
@@ -1073,17 +1073,17 @@ async function deleteVehicle(vehicle) {
                     </Text>
                     <TextInput
                       style={styles.densityInput}
-                      value={String(product.densityKgM3 ?? DEFAULT_DENSITY(product.name))}
+                      value={String(product.densityKgPerL ?? DEFAULT_DENSITY(product.name))}
                       onChangeText={(value) =>
                         updateProduct(
                           dealer.id,
                           product.name,
-                          "densityKgM3",
-                          value.replace(/[^0-9.]/g, "")
+                          "densityKgPerL",
+                          value.replace(/[^0-9.,]/g, "").replace(",", ".")
                         )
                       }
                       keyboardType="decimal-pad"
-                      placeholder="kg/m³"
+                      placeholder="kg/litre"
                     />
                   </View>
 
@@ -1317,7 +1317,7 @@ async function deleteVehicle(vehicle) {
                     {formatLiters(item.loaded)} L / {formatLiters(item.capacity)} L
                   </Text>
                   <Text style={styles.muted}>
-                    Kesafet: {item.densityKgM3} kg/m³ · Yaklaşık ağırlık: {formatLiters(Math.round(item.loaded * item.densityKgM3 / 1000))} kg
+                    Litre kesafeti: {item.densityKgPerL} kg/litre · Yaklaşık ağırlık: {formatLiters(Math.round(item.loaded * item.densityKgPerL))} kg
                   </Text>
                 </View>
               </View>
