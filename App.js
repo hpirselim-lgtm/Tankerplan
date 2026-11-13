@@ -233,13 +233,14 @@ function findBestCombination(eyes, demand) {
         better = true;
       } else if (
         candidate.excess === best.excess &&
-        candidate.selected.length < best.selected.length
+        candidate.selected[0].number < best.selected[0].number
       ) {
+        // Kapasite eşleşmesi aynıysa daha öndeki gözden başlayan dizilimi seç.
         better = true;
       } else if (
         candidate.excess === best.excess &&
-        candidate.selected.length === best.selected.length &&
-        candidate.selected[0].number < best.selected[0].number
+        candidate.selected[0].number === best.selected[0].number &&
+        candidate.selected.length < best.selected.length
       ) {
         better = true;
       }
@@ -248,6 +249,13 @@ function findBestCombination(eyes, demand) {
         better = true;
       } else if (
         candidate.total === best.total &&
+        candidate.selected[0].number < best.selected[0].number
+      ) {
+        // Talebin tamamı karşılanamıyorsa da ilk göz önceliğini koru.
+        better = true;
+      } else if (
+        candidate.total === best.total &&
+        candidate.selected[0].number === best.selected[0].number &&
         candidate.selected.length < best.selected.length
       ) {
         better = true;
