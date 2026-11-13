@@ -420,8 +420,11 @@ function createLoadingPlan(eyes, dealers) {
 
     if (!bestTask || !bestCombo) break;
 
+    const priorityIndex = new Map(
+      remainingEyes.map((eye, index) => [eye.id, index])
+    );
     const selectedEyes = [...bestCombo.selected].sort(
-      (a, b) => a.number - b.number
+      (a, b) => priorityIndex.get(a.id) - priorityIndex.get(b.id)
     );
 
     const totalCapacity = selectedEyes.reduce(
@@ -453,8 +456,9 @@ function createLoadingPlan(eyes, dealers) {
         )
         .sort((a, b) => {
           if (prioritizeFront) {
-            // Öncelikli gözler dolu kalsın; gerekiyorsa kısmi dolumu daha arkadaki seçili gözde yap.
-            return b.eye.number - a.eye.number;
+            // 1, 2, son, 3, 4, 5 sırasındaki önceki gözleri tam tut;
+            // kısmi dolumu öncelik sırasındaki daha sonraki göze bırak.
+            return priorityIndex.get(b.eye.id) - priorityIndex.get(a.eye.id);
           }
           if (a.distance !== b.distance) {
             return a.distance - b.distance;
