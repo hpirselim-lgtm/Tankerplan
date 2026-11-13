@@ -302,6 +302,40 @@ function createLoadingPlan(eyes, dealers) {
 
     if (!activeTasks.length) break;
 
+    // %85 altında sıradaki öncelikli göz (1, 2, son, sonra orta)
+    // kapasitesi kadar tek ürünle tamamen doldurulabiliyorsa bunu önce yap.
+    const nextPriorityEye = prioritizeFront ? remainingEyes[0] : null;
+    if (nextPriorityEye) {
+      const fullFillTasks = activeTasks
+        .filter((task) => task.remaining >= nextPriorityEye.capacity)
+        .sort((a, b) =>
+          (a.remaining - nextPriorityEye.capacity) -
+          (b.remaining - nextPriorityEye.capacity)
+        );
+
+      if (fullFillTasks.length > 0) {
+        const task = fullFillTasks[0];
+        const item = {
+          eyeNumber: nextPriorityEye.number,
+          capacity: nextPriorityEye.capacity,
+          loaded: nextPriorityEye.capacity,
+          company: task.company,
+          dealer: task.dealer,
+          product: task.product,
+          densityKgPerL: task.densityKgPerL,
+          color: PRODUCT_COLORS[task.product] || "#64748B",
+        };
+
+        allocations.push(item);
+        task.allocations.push(item);
+        task.remaining -= nextPriorityEye.capacity;
+        remainingEyes = remainingEyes.filter(
+          (eye) => eye.id !== nextPriorityEye.id
+        );
+        continue;
+      }
+    }
+
     let bestTask = null;
     let bestCombo = null;
 
