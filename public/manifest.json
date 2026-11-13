@@ -10,7 +10,7 @@
   "theme_color": "#111111",
   "icons": [
     {
-      "src": "/Tankerplan/assets/tankerplan-logo.svg",
+      "src": "/Tankerplan/tankerplan-logo.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
