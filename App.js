@@ -264,6 +264,21 @@ function createLoadingPlan(eyes, dealers) {
   // %85'in altında ön göz önceliği; %85 ve üzerinde en iyi kapasite eşleşmesi.
   const prioritizeFront = fillRatio < 0.85;
 
+  // %85 altında deneme sırası: 1. göz, 2. göz, son göz,
+  // ardından aradaki gözler kapasite eşleşmesine göre.
+  const orderedFreeEyes = prioritizeFront && freeEyes.length > 2
+    ? [
+        ...freeEyes.filter((eye) => eye.number === 1),
+        ...freeEyes.filter((eye) => eye.number === 2),
+        ...freeEyes.filter((eye) => eye.number === Math.max(...freeEyes.map((item) => item.number))),
+        ...freeEyes.filter((eye) =>
+          eye.number !== 1 &&
+          eye.number !== 2 &&
+          eye.number !== Math.max(...freeEyes.map((item) => item.number))
+        ),
+      ]
+    : [...freeEyes];
+
   const tasks = [];
 
   dealers.forEach((dealer, dealerIndex) => {
@@ -288,7 +303,7 @@ function createLoadingPlan(eyes, dealers) {
   });
 
   const allocations = [];
-  let remainingEyes = [...freeEyes];
+  let remainingEyes = [...orderedFreeEyes];
 
   while (remainingEyes.length > 0) {
     const activeTasks = tasks.filter(
@@ -317,7 +332,7 @@ function createLoadingPlan(eyes, dealers) {
 
       let better = false;
 
-      // %85 altında sıradaki ön gözü tam doldurabilecek ürünü önce seç.
+      // %85 altında sıradaki öncelikli gözü (1, 2, son, ardından orta) tam doldurabilecek ürünü önce seç.
       const frontEye = remainingEyes[0];
       const canFillFront = prioritizeFront &&
         frontEye &&
@@ -438,7 +453,7 @@ function createLoadingPlan(eyes, dealers) {
         )
         .sort((a, b) => {
           if (prioritizeFront) {
-            // Ön göz dolu kalsın; gerekiyorsa kısmi dolumu seçilen arka gözde yap.
+            // Öncelikli gözler dolu kalsın; gerekiyorsa kısmi dolumu daha arkadaki seçili gözde yap.
             return b.eye.number - a.eye.number;
           }
           if (a.distance !== b.distance) {
