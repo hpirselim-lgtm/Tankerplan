@@ -2008,10 +2008,14 @@ const styles = StyleSheet.create({
   },
   summaryGrid: {
     flexDirection: "row",
+    flexWrap: "wrap",
+    width: "100%",
+    minWidth: 0,
     gap: 7,
   },
   summaryItem: {
     flex: 1,
+    minWidth: 88,
     backgroundColor: "#edf2f5",
     borderRadius: 9,
     padding: 9,
@@ -2051,11 +2055,13 @@ const styles = StyleSheet.create({
   tankGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
+    width: "100%",
+    minWidth: 0,
     gap: 9,
   },
   tankEye: {
     width: "22%",
-    minWidth: 72,
+    minWidth: 62,
     alignItems: "center",
     backgroundColor: "#f4f7f9",
     borderRadius: 9,
@@ -2104,6 +2110,8 @@ const styles = StyleSheet.create({
   resultRow: {
     flexDirection: "row",
     alignItems: "center",
+    width: "100%",
+    minWidth: 0,
     borderBottomWidth: 1,
     borderBottomColor: "#edf1f4",
     paddingVertical: 10,
@@ -2122,11 +2130,13 @@ const styles = StyleSheet.create({
   },
   resultDetails: {
     flex: 1,
+    minWidth: 0,
   },
   resultProduct: {
     color: "#17364d",
     fontWeight: "800",
     fontSize: 13,
+    flexShrink: 1,
   },
   resultLiters: {
     color: "#147b57",
