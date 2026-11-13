@@ -338,11 +338,19 @@ function createLoadingPlan(eyes, dealers) {
           better = true;
         } else if (
           combo.excess === bestCombo.excess &&
+          combo.selected[0].number < bestCombo.selected[0].number
+        ) {
+          // Ürünler arası eşit kapasite eşleşmesinde daha öndeki gözleri tercih et.
+          better = true;
+        } else if (
+          combo.excess === bestCombo.excess &&
+          combo.selected[0].number === bestCombo.selected[0].number &&
           combo.selected.length < bestCombo.selected.length
         ) {
           better = true;
         } else if (
           combo.excess === bestCombo.excess &&
+          combo.selected[0].number === bestCombo.selected[0].number &&
           combo.selected.length === bestCombo.selected.length &&
           task.dealerIndex < bestTask.dealerIndex
         ) {
@@ -352,6 +360,13 @@ function createLoadingPlan(eyes, dealers) {
         better = true;
       } else if (
         combo.total === bestCombo.total &&
+        combo.selected[0].number < bestCombo.selected[0].number
+      ) {
+        // Karşılanamayan taleplerde de eşit toplamda ilk göz önceliklidir.
+        better = true;
+      } else if (
+        combo.total === bestCombo.total &&
+        combo.selected[0].number === bestCombo.selected[0].number &&
         task.dealerIndex < bestTask.dealerIndex
       ) {
         better = true;
