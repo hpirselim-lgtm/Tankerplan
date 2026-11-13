@@ -8,8 +8,11 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
+  Platform,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Print from "expo-print";
+import * as Sharing from "expo-sharing";
 
 const STORAGE_KEY = "TANKERPLAN_VEHICLES_V1";
 
@@ -68,6 +71,105 @@ const parseLiters = (value) => {
 
 const formatLiters = (value) =>
   Number(value || 0).toLocaleString("tr-TR");
+
+const escapeHtml = (value) =>
+  String(value ?? "").replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  }[character]));
+
+function createPlanReportHtml({ plan, plate, trailerPlate, vehicleType, eyes }) {
+  const createdAt = new Date().toLocaleString("tr-TR");
+  const vehicleLabel = vehicleType === "tractor_semitrailer"
+    ? `Çekici: ${plate || "—"} · Yarı römork: ${trailerPlate || "—"}`
+    : `Kamyon: ${plate || "—"}`;
+
+  const allocationRows = plan.allocations.map((item) => `
+    <tr>
+      <td>${item.eyeNumber}. Göz</td>
+      <td>${escapeHtml(item.company)}</td>
+      <td>${escapeHtml(item.dealer)}</td>
+      <td>${escapeHtml(item.product)}</td>
+      <td class="number">${formatLiters(item.loaded)} L</td>
+      <td class="number">${formatLiters(item.capacity)} L</td>
+      <td class="number">${Number(item.densityKgPerL).toLocaleString("tr-TR")} kg/L</td>
+      <td class="number">${formatLiters(Math.round(item.loaded * item.densityKgPerL))} kg</td>
+    </tr>`).join("");
+
+  const taskRows = plan.tasks.map((task) => `
+    <tr>
+      <td>${escapeHtml(task.company)}</td>
+      <td>${escapeHtml(task.dealer)}</td>
+      <td>${escapeHtml(task.product)}</td>
+      <td class="number">${formatLiters(task.demand)} L</td>
+      <td class="number">${formatLiters(task.remaining)} L</td>
+    </tr>`).join("");
+
+  const emptyEyes = plan.emptyEyes.length
+    ? plan.emptyEyes.map((eye) => `${eye.number}. Göz`).join(", ")
+    : "Yok";
+
+  return `<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TankerPlan Yükleme Planı - ${escapeHtml(plate || "Araç")}</title>
+<style>
+  @page { size: A4 landscape; margin: 12mm; }
+  * { box-sizing: border-box; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #17364d; margin: 0; font-size: 10px; }
+  header { border-bottom: 3px solid #e11d2e; padding-bottom: 12px; margin-bottom: 14px; }
+  h1 { margin: 0; font-size: 23px; color: #102d45; }
+  .subtitle { margin-top: 4px; color: #647684; font-size: 11px; }
+  .meta { display: flex; justify-content: space-between; gap: 16px; margin: 12px 0; font-size: 11px; }
+  .summary { display: flex; gap: 8px; margin: 12px 0 16px; }
+  .summary div { flex: 1; background: #edf2f5; border-radius: 6px; padding: 9px; }
+  .summary b { display: block; font-size: 15px; margin-top: 4px; color: #102d45; }
+  h2 { font-size: 13px; margin: 16px 0 7px; color: #102d45; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+  th { background: #102d45; color: white; text-align: left; }
+  th, td { border: 1px solid #d8e0e6; padding: 6px; vertical-align: top; }
+  tr { page-break-inside: avoid; }
+  .number { text-align: right; white-space: nowrap; }
+  .warning { background: #fff5e8; border: 1px solid #f1d3a9; padding: 8px; border-radius: 5px; margin-top: 8px; }
+  .note { color: #647684; font-size: 9px; line-height: 1.5; margin-top: 14px; }
+  footer { border-top: 1px solid #d8e0e6; padding-top: 8px; margin-top: 18px; color: #647684; font-size: 9px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>TankerPlan</h1>
+  <div class="subtitle">Akaryakıt Tankeri Yükleme Planı</div>
+</header>
+<div class="meta"><strong>${escapeHtml(vehicleLabel)}</strong><span>Oluşturulma: ${escapeHtml(createdAt)}</span></div>
+<div class="summary">
+  <div>Toplam talep<b>${formatLiters(plan.totalDemand)} L</b></div>
+  <div>Yüklenecek<b>${formatLiters(plan.totalLoaded)} L</b></div>
+  <div>Karşılanamayan<b>${formatLiters(plan.unallocated)} L</b></div>
+  <div>Tahmini ürün ağırlığı<b>${formatLiters(Math.round(plan.totalMassKg))} kg</b></div>
+  <div>Toplam tanker kapasitesi<b>${formatLiters(eyes.reduce((sum, eye) => sum + eye.capacity, 0))} L</b></div>
+</div>
+<h2>Göz Bazında Yükleme Listesi</h2>
+<table>
+<thead><tr><th>Göz</th><th>Dağıtım şirketi</th><th>Bayi</th><th>Ürün</th><th class="number">Yüklenecek</th><th class="number">Göz kapasitesi</th><th class="number">Kesafet</th><th class="number">Tahmini ağırlık</th></tr></thead>
+<tbody>${allocationRows || '<tr><td colspan="8">Yükleme bulunamadı.</td></tr>'}</tbody>
+</table>
+<h2>Ürün Talep Özeti</h2>
+<table>
+<thead><tr><th>Dağıtım şirketi</th><th>Bayi</th><th>Ürün</th><th class="number">Talep</th><th class="number">Karşılanamayan</th></tr></thead>
+<tbody>${taskRows || '<tr><td colspan="5">Talep bulunamadı.</td></tr>'}</tbody>
+</table>
+<div class="warning"><strong>Boş kalan gözler:</strong> ${escapeHtml(emptyEyes)}</div>
+${plan.unallocated > 0 ? `<div class="warning"><strong>Uyarı:</strong> ${formatLiters(plan.unallocated)} L ürün talebi karşılanamadı.</div>` : ""}
+<p class="note">Kesafet değerleri yaklaşık varsayılandır; ağırlık hesabı tahminidir. Gerçek sevkiyat için analiz belgesi veya ölçüm sertifikasındaki değer esas alınmalıdır. Bu rapor yükleme planlama amacıyla hazırlanmıştır; gerçek yükleme ve araç ağırlık kontrollerinin yerini almaz.</p>
+<footer>TANKERPLAN · Tasarım ve Geliştirme: Halim Pirselimoğlu</footer>
+</body>
+</html>`;
+}
 
 function makeDealer() {
   return {
@@ -817,6 +919,53 @@ async function deleteVehicle(vehicle) {
     setCutSummary({ product: selectedTask.product, liters: totalCutLiters, withinLimit: nextPlan.totalMassKg <= payloadKg });
   }
 
+
+  function getPlanReportHtml() {
+    return createPlanReportHtml({
+      plan,
+      plate,
+      trailerPlate,
+      vehicleType,
+      eyes,
+    });
+  }
+
+  async function savePlanPdf() {
+    if (!plan) return;
+    try {
+      const html = getPlanReportHtml();
+      if (Platform.OS === "web") {
+        // Tarayıcı yazdırma penceresinde "PDF olarak kaydet" seçilebilir.
+        await Print.printAsync({ html });
+        return;
+      }
+
+      const file = await Print.printToFileAsync({ html });
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(file.uri, {
+          mimeType: "application/pdf",
+          dialogTitle: "TankerPlan PDF kaydet veya paylaş",
+          UTI: "com.adobe.pdf",
+        });
+      } else {
+        Alert.alert("PDF hazır", `PDF dosyası oluşturuldu: ${file.uri}`);
+      }
+    } catch (error) {
+      console.error("PDF oluşturma hatası:", error);
+      Alert.alert("PDF oluşturulamadı", "Lütfen tekrar deneyin.");
+    }
+  }
+
+  async function printPlan() {
+    if (!plan) return;
+    try {
+      await Print.printAsync({ html: getPlanReportHtml() });
+    } catch (error) {
+      console.error("Yazdırma hatası:", error);
+      Alert.alert("Yazdırma açılamadı", "Cihazınızın yazdırma özelliğini kontrol edin.");
+    }
+  }
+
   const totalCapacity = eyes.reduce(
     (sum, eye) => sum + eye.capacity,
     0
@@ -1181,6 +1330,21 @@ async function deleteVehicle(vehicle) {
             <Text style={styles.sectionTitle}>
               4. Yükleme Planı
             </Text>
+
+            <View style={styles.exportButtons}>
+              <TouchableOpacity
+                style={styles.pdfButton}
+                onPress={savePlanPdf}
+              >
+                <Text style={styles.buttonText}>PDF OLARAK KAYDET</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.printButton}
+                onPress={printPlan}
+              >
+                <Text style={styles.buttonText}>YAZDIR</Text>
+              </TouchableOpacity>
+            </View>
 
             <View style={styles.summaryGrid}>
               <View style={styles.summaryItem}>
@@ -1765,6 +1929,30 @@ const styles = StyleSheet.create({
     padding: 16,
     alignItems: "center",
     marginTop: 16,
+  },
+  exportButtons: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 12,
+  },
+  pdfButton: {
+    flex: 1,
+    minWidth: 145,
+    backgroundColor: "#147b57",
+    borderRadius: 9,
+    padding: 13,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  printButton: {
+    flex: 1,
+    minWidth: 120,
+    backgroundColor: "#173e59",
+    borderRadius: 9,
+    padding: 13,
+    alignItems: "center",
+    justifyContent: "center",
   },
   summaryGrid: {
     flexDirection: "row",
