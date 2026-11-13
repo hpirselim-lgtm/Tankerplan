@@ -2,18 +2,18 @@
   "name": "TankerPlan",
   "short_name": "TankerPlan",
   "description": "Akaryakıt tanker dolum ve planlama uygulaması",
-  "start_url": "/",
-  "scope": "/",
+  "start_url": "/Tankerplan/",
+  "scope": "/Tankerplan/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#111111",
   "theme_color": "#111111",
   "icons": [
     {
-      "src": "/Tankerplan/tankerplan-logo.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "src": "/Tankerplan/icon-180.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
     }
   ]
 }
