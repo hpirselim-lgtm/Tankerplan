@@ -930,13 +930,52 @@ async function deleteVehicle(vehicle) {
     });
   }
 
+  function openWebPlanReport() {
+    const html = getPlanReportHtml().replace(
+      "</style>",
+      `
+        .web-report-toolbar { position: sticky; top: 0; z-index: 10; display: flex; justify-content: center; gap: 10px; padding: 12px; background: #102d45; }
+        .web-report-toolbar button { border: 0; border-radius: 7px; padding: 11px 16px; color: #fff; background: #147b57; font-size: 14px; font-weight: 700; }
+        @media print { .web-report-toolbar { display: none !important; } }
+      </style>`
+    ).replace(
+      "<body>",
+      `<body><div class="web-report-toolbar"><button onclick="window.print()">PDF OLARAK KAYDET / YAZDIR</button></div>`
+    );
+
+    // Açılır pencere doğrudan kullanıcı dokunuşu sırasında oluşturulur;
+    // böylece iOS/Safari açılır pencere engeline takılma olasılığı azalır.
+    const reportWindow = window.open("", "_blank");
+    if (!reportWindow) {
+      Alert.alert(
+        "Rapor açılamadı",
+        "Tarayıcı yeni pencereyi engelledi. TankerPlan'ı Safari'de açıp tekrar deneyin."
+      );
+      return;
+    }
+
+    reportWindow.document.open();
+    reportWindow.document.write(html);
+    reportWindow.document.close();
+    reportWindow.focus();
+
+    // Yazdırma penceresi açılamazsa rapor yeni sekmede kalır;
+    // üstteki düğme ile kullanıcı yeniden başlatabilir.
+    window.setTimeout(() => {
+      try {
+        reportWindow.print();
+      } catch (error) {
+        console.warn("Otomatik yazdırma başlatılamadı:", error);
+      }
+    }, 700);
+  }
+
   async function savePlanPdf() {
     if (!plan) return;
     try {
       const html = getPlanReportHtml();
       if (Platform.OS === "web") {
-        // Tarayıcı yazdırma penceresinde "PDF olarak kaydet" seçilebilir.
-        await Print.printAsync({ html });
+        openWebPlanReport();
         return;
       }
 
@@ -959,6 +998,10 @@ async function deleteVehicle(vehicle) {
   async function printPlan() {
     if (!plan) return;
     try {
+      if (Platform.OS === "web") {
+        openWebPlanReport();
+        return;
+      }
       await Print.printAsync({ html: getPlanReportHtml() });
     } catch (error) {
       console.error("Yazdırma hatası:", error);
