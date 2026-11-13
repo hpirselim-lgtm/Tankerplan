@@ -188,16 +188,18 @@ function findBestCombination(eyes, demand, prioritizeFront) {
   if (!eyes.length || demand <= 0) return null;
 
   let best = null;
-  const totalMasks = 1 << eyes.length;
-  // Kalan gözler numara sırasıyla gelir. %85 altında her adımda
-  // sıradaki en ön göz kombinasyona dahil edilerek 2., 3. göz atlanmaz.
-  const firstEyeIndex = 0;
 
-  for (let mask = 1; mask < totalMasks; mask++) {
-    if (prioritizeFront && !(mask & (1 << firstEyeIndex))) continue;
+  // Öncelik sırası 1, 2, son, ardından orta gözlerdir.
+  // %85 altında göz atlamak yasak: yalnızca sıradaki gözden başlayan
+  // kesintisiz bir ön ek kombinasyonu değerlendirilebilir.
+  const masks = prioritizeFront
+    ? Array.from({ length: eyes.length }, (_, index) => (1 << (index + 1)) - 1)
+    : Array.from({ length: (1 << eyes.length) - 1 }, (_, index) => index + 1);
 
+  for (const mask of masks) {
     const selected = [];
     let total = 0;
+
     for (let i = 0; i < eyes.length; i++) {
       if (mask & (1 << i)) {
         selected.push(eyes[i]);
@@ -223,25 +225,13 @@ function findBestCombination(eyes, demand, prioritizeFront) {
     } else if (candidate.enough) {
       if (candidate.excess !== best.excess) {
         better = candidate.excess < best.excess;
-      } else if (prioritizeFront &&
-        candidate.selected[0].number !== best.selected[0].number) {
-        better = candidate.selected[0].number < best.selected[0].number;
       } else if (candidate.selected.length !== best.selected.length) {
         better = candidate.selected.length < best.selected.length;
-      } else if (!prioritizeFront) {
-        better = candidate.selected[0].number < best.selected[0].number;
       }
-    } else {
-      if (candidate.total !== best.total) {
-        better = candidate.total > best.total;
-      } else if (prioritizeFront &&
-        candidate.selected[0].number !== best.selected[0].number) {
-        better = candidate.selected[0].number < best.selected[0].number;
-      } else if (candidate.selected.length !== best.selected.length) {
-        better = candidate.selected.length < best.selected.length;
-      } else if (!prioritizeFront) {
-        better = candidate.selected[0].number < best.selected[0].number;
-      }
+    } else if (candidate.total !== best.total) {
+      better = candidate.total > best.total;
+    } else if (candidate.selected.length !== best.selected.length) {
+      better = candidate.selected.length < best.selected.length;
     }
 
     if (better) best = candidate;
