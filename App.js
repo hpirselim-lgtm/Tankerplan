@@ -191,6 +191,11 @@ function findBestCombination(eyes, demand) {
   const totalMasks = 1 << eyes.length;
 
   for (let mask = 1; mask < totalMasks; mask++) {
+    // 1. göz mevcutsa, her ürün kombinasyonunda mutlaka yer alır.
+    // Böylece yük varken ön göz kapasite eşleşmesi uğruna boş bırakılamaz.
+    const firstEyeIndex = eyes.findIndex((eye) => eye.number === 1);
+    if (firstEyeIndex >= 0 && !(mask & (1 << firstEyeIndex))) continue;
+
     const selected = [];
     let total = 0;
 
