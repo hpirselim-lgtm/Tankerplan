@@ -317,7 +317,20 @@ function createLoadingPlan(eyes, dealers) {
 
       let better = false;
 
-      if (combo.exact && !bestCombo.exact) {
+      // %85 altında sıradaki ön gözü tam doldurabilecek ürünü önce seç.
+      const frontEye = remainingEyes[0];
+      const canFillFront = prioritizeFront &&
+        frontEye &&
+        task.remaining >= frontEye.capacity &&
+        combo.selected.some((eye) => eye.id === frontEye.id);
+      const bestCanFillFront = prioritizeFront &&
+        frontEye &&
+        bestTask.remaining >= frontEye.capacity &&
+        bestCombo.selected.some((eye) => eye.id === frontEye.id);
+
+      if (prioritizeFront && canFillFront !== bestCanFillFront) {
+        better = canFillFront;
+      } else if (combo.exact && !bestCombo.exact) {
         better = true;
       } else if (!combo.exact && bestCombo.exact) {
         better = false;
@@ -424,6 +437,10 @@ function createLoadingPlan(eyes, dealers) {
             item.required < item.eye.capacity
         )
         .sort((a, b) => {
+          if (prioritizeFront) {
+            // Ön göz dolu kalsın; gerekiyorsa kısmi dolumu seçilen arka gözde yap.
+            return b.eye.number - a.eye.number;
+          }
           if (a.distance !== b.distance) {
             return a.distance - b.distance;
           }
