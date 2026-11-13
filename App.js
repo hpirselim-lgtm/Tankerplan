@@ -1752,7 +1752,7 @@ const styles = StyleSheet.create({
     borderColor: "#d5dfe6",
     borderRadius: 9,
     padding: 12,
-    fontSize: 15,
+    fontSize: 16,
     color: "#172b3a",
     backgroundColor: "#fbfcfd",
   },
@@ -1843,7 +1843,7 @@ const styles = StyleSheet.create({
     borderColor: "#d5dfe6",
     padding: 10,
     borderRadius: 8,
-    fontSize: 14,
+    fontSize: 16,
   },
   removeEyeButton: {
     paddingHorizontal: 10,
@@ -1952,7 +1952,7 @@ const styles = StyleSheet.create({
     borderColor: "#d5dfe6",
     borderRadius: 7,
     padding: 7,
-    fontSize: 12,
+    fontSize: 16,
     color: "#334c5d",
   },
   massSummary: {
@@ -1973,7 +1973,7 @@ const styles = StyleSheet.create({
     borderRadius: 7,
     padding: 9,
     textAlign: "right",
-    fontSize: 14,
+    fontSize: 16,
   },
   calculateButton: {
     backgroundColor: "#173e59",
