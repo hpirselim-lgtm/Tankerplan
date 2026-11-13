@@ -184,21 +184,19 @@ function makeDealer() {
   };
 }
 
-function findBestCombination(eyes, demand) {
+function findBestCombination(eyes, demand, prioritizeFront) {
   if (!eyes.length || demand <= 0) return null;
 
   let best = null;
   const totalMasks = 1 << eyes.length;
+  const firstEyeIndex = eyes.findIndex((eye) => eye.number === 1);
 
   for (let mask = 1; mask < totalMasks; mask++) {
-    // 1. göz mevcutsa, her ürün kombinasyonunda mutlaka yer alır.
-    // Böylece yük varken ön göz kapasite eşleşmesi uğruna boş bırakılamaz.
-    const firstEyeIndex = eyes.findIndex((eye) => eye.number === 1);
-    if (firstEyeIndex >= 0 && !(mask & (1 << firstEyeIndex))) continue;
+    // Tanker doluluğu düşükken ön gözleri önce kullan.
+    if (prioritizeFront && firstEyeIndex >= 0 && !(mask & (1 << firstEyeIndex))) continue;
 
     const selected = [];
     let total = 0;
-
     for (let i = 0; i < eyes.length; i++) {
       if (mask & (1 << i)) {
         selected.push(eyes[i]);
@@ -209,14 +207,7 @@ function findBestCombination(eyes, demand) {
     const exact = total === demand;
     const enough = total >= demand;
     const excess = Math.max(0, total - demand);
-
-    const candidate = {
-      selected,
-      total,
-      exact,
-      enough,
-      excess,
-    };
+    const candidate = { selected, total, exact, enough, excess };
 
     if (!best) {
       best = candidate;
@@ -224,46 +215,31 @@ function findBestCombination(eyes, demand) {
     }
 
     let better = false;
-
-    if (candidate.exact && !best.exact) {
-      better = true;
-    } else if (!candidate.exact && best.exact) {
-      better = false;
-    } else if (candidate.enough && !best.enough) {
-      better = true;
-    } else if (!candidate.enough && best.enough) {
-      better = false;
-    } else if (candidate.enough && best.enough) {
-      if (candidate.excess < best.excess) {
-        better = true;
-      } else if (
-        candidate.excess === best.excess &&
-        candidate.selected[0].number < best.selected[0].number
-      ) {
-        // Kapasite eşleşmesi aynıysa daha öndeki gözden başlayan dizilimi seç.
-        better = true;
-      } else if (
-        candidate.excess === best.excess &&
-        candidate.selected[0].number === best.selected[0].number &&
-        candidate.selected.length < best.selected.length
-      ) {
-        better = true;
+    if (candidate.exact !== best.exact) {
+      better = candidate.exact;
+    } else if (candidate.enough !== best.enough) {
+      better = candidate.enough;
+    } else if (candidate.enough) {
+      if (candidate.excess !== best.excess) {
+        better = candidate.excess < best.excess;
+      } else if (prioritizeFront &&
+        candidate.selected[0].number !== best.selected[0].number) {
+        better = candidate.selected[0].number < best.selected[0].number;
+      } else if (candidate.selected.length !== best.selected.length) {
+        better = candidate.selected.length < best.selected.length;
+      } else if (!prioritizeFront) {
+        better = candidate.selected[0].number < best.selected[0].number;
       }
     } else {
-      if (candidate.total > best.total) {
-        better = true;
-      } else if (
-        candidate.total === best.total &&
-        candidate.selected[0].number < best.selected[0].number
-      ) {
-        // Talebin tamamı karşılanamıyorsa da ilk göz önceliğini koru.
-        better = true;
-      } else if (
-        candidate.total === best.total &&
-        candidate.selected[0].number === best.selected[0].number &&
-        candidate.selected.length < best.selected.length
-      ) {
-        better = true;
+      if (candidate.total !== best.total) {
+        better = candidate.total > best.total;
+      } else if (prioritizeFront &&
+        candidate.selected[0].number !== best.selected[0].number) {
+        better = candidate.selected[0].number < best.selected[0].number;
+      } else if (candidate.selected.length !== best.selected.length) {
+        better = candidate.selected.length < best.selected.length;
+      } else if (!prioritizeFront) {
+        better = candidate.selected[0].number < best.selected[0].number;
       }
     }
 
@@ -272,11 +248,20 @@ function findBestCombination(eyes, demand) {
 
   return best;
 }
-
 function createLoadingPlan(eyes, dealers) {
   const freeEyes = eyes
     .filter((eye) => eye.capacity > 0)
     .map((eye) => ({ ...eye }));
+
+  const totalTankCapacity = freeEyes.reduce((sum, eye) => sum + eye.capacity, 0);
+  const totalRequestedLiters = dealers.reduce((sum, dealer) =>
+    sum + dealer.products.reduce((productSum, product) =>
+      productSum + parseLiters(product.liters), 0), 0);
+  const fillRatio = totalTankCapacity > 0
+    ? totalRequestedLiters / totalTankCapacity
+    : 0;
+  // %85'in altında ön göz önceliği; %85 ve üzerinde en iyi kapasite eşleşmesi.
+  const prioritizeFront = fillRatio < 0.85;
 
   const tasks = [];
 
@@ -317,7 +302,8 @@ function createLoadingPlan(eyes, dealers) {
     activeTasks.forEach((task) => {
       const combo = findBestCombination(
         remainingEyes,
-        task.remaining
+        task.remaining,
+        prioritizeFront
       );
 
       if (!combo) return;
@@ -343,20 +329,27 @@ function createLoadingPlan(eyes, dealers) {
           better = true;
         } else if (
           combo.excess === bestCombo.excess &&
+          prioritizeFront &&
           combo.selected[0].number < bestCombo.selected[0].number
         ) {
-          // Ürünler arası eşit kapasite eşleşmesinde daha öndeki gözleri tercih et.
           better = true;
         } else if (
           combo.excess === bestCombo.excess &&
-          combo.selected[0].number === bestCombo.selected[0].number &&
+          (!prioritizeFront ||
+            combo.selected[0].number === bestCombo.selected[0].number) &&
           combo.selected.length < bestCombo.selected.length
         ) {
           better = true;
         } else if (
           combo.excess === bestCombo.excess &&
-          combo.selected[0].number === bestCombo.selected[0].number &&
           combo.selected.length === bestCombo.selected.length &&
+          combo.selected[0].number < bestCombo.selected[0].number
+        ) {
+          better = true;
+        } else if (
+          combo.excess === bestCombo.excess &&
+          combo.selected.length === bestCombo.selected.length &&
+          combo.selected[0].number === bestCombo.selected[0].number &&
           task.dealerIndex < bestTask.dealerIndex
         ) {
           better = true;
@@ -365,18 +358,31 @@ function createLoadingPlan(eyes, dealers) {
         better = true;
       } else if (
         combo.total === bestCombo.total &&
+        prioritizeFront &&
         combo.selected[0].number < bestCombo.selected[0].number
       ) {
-        // Karşılanamayan taleplerde de eşit toplamda ilk göz önceliklidir.
         better = true;
       } else if (
         combo.total === bestCombo.total &&
+        (!prioritizeFront ||
+          combo.selected[0].number === bestCombo.selected[0].number) &&
+        combo.selected.length < bestCombo.selected.length
+      ) {
+        better = true;
+      } else if (
+        combo.total === bestCombo.total &&
+        combo.selected.length === bestCombo.selected.length &&
+        combo.selected[0].number < bestCombo.selected[0].number
+      ) {
+        better = true;
+      } else if (
+        combo.total === bestCombo.total &&
+        combo.selected.length === bestCombo.selected.length &&
         combo.selected[0].number === bestCombo.selected[0].number &&
         task.dealerIndex < bestTask.dealerIndex
       ) {
         better = true;
       }
-
       if (better) {
         bestTask = task;
         bestCombo = combo;
