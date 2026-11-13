@@ -1666,9 +1666,15 @@ async function deleteVehicle(vehicle) {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
+    width: "100%",
+    maxWidth: "100%",
     backgroundColor: "#eef2f5",
+    overflow: "hidden",
   },
   container: {
+    width: "100%",
+    maxWidth: "100%",
+    alignSelf: "stretch",
     padding: 14,
     paddingBottom: 40,
   },
@@ -1714,6 +1720,8 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   card: {
+    width: "100%",
+    minWidth: 0,
     backgroundColor: "#ffffff",
     padding: 15,
     borderRadius: 14,
@@ -1920,6 +1928,7 @@ const styles = StyleSheet.create({
   },
   productInfo: {
     flex: 1,
+    minWidth: 0,
     gap: 5,
   },
   productName: {
