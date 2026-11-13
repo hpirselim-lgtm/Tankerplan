@@ -524,6 +524,26 @@ export default function App() {
 
   useEffect(() => {
     loadVehicles();
+
+    // iPhone Safari'de klavye açıldığında yatay taşmayı engelle.
+    if (Platform.OS === "web" && typeof document !== "undefined") {
+      const styleId = "tankerplan-mobile-viewport-fix";
+      if (!document.getElementById(styleId)) {
+        const style = document.createElement("style");
+        style.id = styleId;
+        style.textContent = `
+          html, body, #root {
+            width: 100% !important;
+            max-width: 100% !important;
+            overflow-x: hidden !important;
+          }
+          *, *::before, *::after {
+            box-sizing: border-box;
+          }
+        `;
+        document.head.appendChild(style);
+      }
+    }
   }, []);
 
   async function loadVehicles() {
@@ -1914,7 +1934,11 @@ const styles = StyleSheet.create({
     color: "#ffffff",
   },
   productRow: {
+    width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
     flexDirection: "row",
+    flexWrap: "wrap",
     alignItems: "center",
     borderBottomWidth: 1,
     borderBottomColor: "#edf1f4",
