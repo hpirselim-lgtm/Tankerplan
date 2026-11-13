@@ -189,11 +189,12 @@ function findBestCombination(eyes, demand, prioritizeFront) {
 
   let best = null;
   const totalMasks = 1 << eyes.length;
-  const firstEyeIndex = eyes.findIndex((eye) => eye.number === 1);
+  // Kalan gözler numara sırasıyla gelir. %85 altında her adımda
+  // sıradaki en ön göz kombinasyona dahil edilerek 2., 3. göz atlanmaz.
+  const firstEyeIndex = 0;
 
   for (let mask = 1; mask < totalMasks; mask++) {
-    // Tanker doluluğu düşükken ön gözleri önce kullan.
-    if (prioritizeFront && firstEyeIndex >= 0 && !(mask & (1 << firstEyeIndex))) continue;
+    if (prioritizeFront && !(mask & (1 << firstEyeIndex))) continue;
 
     const selected = [];
     let total = 0;
