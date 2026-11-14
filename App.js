@@ -121,25 +121,25 @@ function createPlanReportHtml({ plan, plate, trailerPlate, vehicleType, eyes }) 
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>TankerPlan Yükleme Planı - ${escapeHtml(plate || "Araç")}</title>
 <style>
-  @page { size: A4 landscape; margin: 6mm; }
-  * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  html, body { width: 100%; margin: 0; padding: 0; }
-  body { font-family: Arial, Helvetica, sans-serif; color: #17364d; font-size: 8px; line-height: 1.22; }
-  header { border-bottom: 2px solid #e11d2e; padding: 0 0 5px; margin: 0 0 6px; }
-  h1 { margin: 0; font-size: 18px; color: #102d45; line-height: 1.1; }
-  .subtitle { margin-top: 2px; color: #647684; font-size: 8px; }
-  .meta { display: flex; justify-content: space-between; gap: 10px; margin: 5px 0 6px; font-size: 8px; }
-  .summary { display: flex; gap: 5px; margin: 5px 0 8px; }
-  .summary div { flex: 1; min-width: 0; background: #edf2f5; border: 1px solid #e0e7ed; border-radius: 4px; padding: 5px 6px; font-size: 7px; }
-  .summary b { display: block; font-size: 11px; margin-top: 2px; color: #102d45; white-space: nowrap; }
-  h2 { font-size: 10px; margin: 8px 0 4px; color: #102d45; page-break-after: avoid; }
-  table { width: 100%; border-collapse: collapse; margin: 0 0 6px; table-layout: fixed; page-break-inside: auto; }
+  @page { size: A4 landscape; margin: 9mm; }
+  * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  html, body { width: 100%; min-height: 0; margin: 0; padding: 0; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #17364d; font-size: 10px; line-height: 1.35; }
+  header { border-bottom: 2px solid #e11d2e; padding: 0 0 7px; margin: 0 0 8px; }
+  h1 { margin: 0; font-size: 21px; color: #102d45; line-height: 1.15; }
+  .subtitle { margin-top: 3px; color: #647684; font-size: 10px; }
+  .meta { display: flex; justify-content: space-between; gap: 12px; margin: 7px 0; font-size: 9px; }
+  .summary { display: flex; gap: 7px; margin: 7px 0 10px; break-inside: avoid; page-break-inside: avoid; }
+  .summary div { flex: 1; min-width: 0; background: #edf2f5; border: 1px solid #cbd6de; border-radius: 4px; padding: 7px; font-size: 8px; }
+  .summary b { display: block; font-size: 12px; margin-top: 3px; color: #102d45; white-space: nowrap; }
+  h2 { font-size: 12px; margin: 10px 0 5px; color: #102d45; break-after: avoid; page-break-after: avoid; }
+  table { width: 100%; border-collapse: collapse; margin: 0 0 9px; table-layout: fixed; }
   thead { display: table-header-group; }
-  th { background: #102d45; color: #fff; text-align: left; font-size: 7px; font-weight: 700; }
-  th, td { border: 1px solid #d8e0e6; padding: 3px 4px; vertical-align: middle; overflow-wrap: anywhere; }
-  td { font-size: 7px; }
-  tr { page-break-inside: avoid; break-inside: avoid; }
-  .number { text-align: right; white-space: nowrap; overflow-wrap: normal; font-variant-numeric: tabular-nums; }
+  th { background: #102d45 !important; color: #fff !important; text-align: left; font-size: 9px; font-weight: 700; }
+  th, td { border: 1px solid #9eacb7; padding: 5px 6px; vertical-align: middle; overflow-wrap: break-word; }
+  td { font-size: 9px; }
+  tr { break-inside: avoid; page-break-inside: avoid; }
+  .number { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
   table:first-of-type th:nth-child(1), table:first-of-type td:nth-child(1) { width: 6%; }
   table:first-of-type th:nth-child(2), table:first-of-type td:nth-child(2) { width: 12%; }
   table:first-of-type th:nth-child(3), table:first-of-type td:nth-child(3) { width: 12%; }
@@ -148,13 +148,18 @@ function createPlanReportHtml({ plan, plate, trailerPlate, vehicleType, eyes }) 
   table:first-of-type th:nth-child(6), table:first-of-type td:nth-child(6) { width: 13%; }
   table:first-of-type th:nth-child(7), table:first-of-type td:nth-child(7) { width: 11%; }
   table:first-of-type th:nth-child(8), table:first-of-type td:nth-child(8) { width: 15%; }
-  .warning { background: #fff5e8; border: 1px solid #f1d3a9; padding: 5px 7px; border-radius: 4px; margin-top: 5px; font-size: 7px; }
-  .note { color: #647684; font-size: 6.5px; line-height: 1.3; margin: 6px 0 0; }
-  footer { border-top: 1px solid #d8e0e6; padding-top: 4px; margin-top: 6px; color: #647684; font-size: 7px; }
+  .warning { background: #fff5e8; border: 1px solid #e5c28e; padding: 7px 9px; border-radius: 4px; margin-top: 6px; font-size: 9px; break-inside: avoid; page-break-inside: avoid; }
+  .note { color: #526675; font-size: 8px; line-height: 1.4; margin: 8px 0 0; }
+  footer { border-top: 1px solid #b9c5cd; padding-top: 6px; margin-top: 8px; color: #647684; font-size: 8px; }
+  @media screen {
+    body { padding: 18px; max-width: 1200px; margin: 0 auto; }
+  }
   @media print {
-    html, body { width: 100%; height: auto; }
-    body { margin: 0; }
-    h2, table, .warning, footer { page-break-inside: avoid; }
+    html, body { width: 100%; height: auto !important; min-height: 0 !important; margin: 0 !important; padding: 0 !important; }
+    body { font-size: 9px; }
+    .summary, .warning, footer { break-inside: avoid; page-break-inside: avoid; }
+    table { break-inside: auto; page-break-inside: auto; }
+    h2 { break-after: avoid; page-break-after: avoid; }
   }
 </style>
 </head>
@@ -1179,46 +1184,37 @@ async function deleteVehicle(vehicle) {
   }
 
   function openWebPlanReport() {
-    const html = getPlanReportHtml().replace(
-      "</style>",
-      `
-        .web-report-toolbar {
-          position: sticky;
-          top: 0;
-          z-index: 10;
-          display: flex;
-          justify-content: center;
-          gap: 10px;
-          padding: 12px;
-          background: #102d45;
-        }
-        .web-report-toolbar button {
-          border: 0;
-          border-radius: 7px;
-          padding: 11px 16px;
-          color: #fff;
-          background: #147b57;
-          font-size: 14px;
-          font-weight: 700;
-          cursor: pointer;
-        }
-        @media print {
-          .web-report-toolbar { display: none !important; }
-        }
-      </style>`
-    ).replace(
+    const html = getPlanReportHtml().replace("</style>", `
+      .web-report-toolbar {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        display: flex;
+        justify-content: center;
+        padding: 12px;
+        background: #102d45;
+      }
+      .web-report-toolbar button {
+        border: 0;
+        border-radius: 7px;
+        padding: 12px 18px;
+        color: #fff;
+        background: #147b57;
+        font-size: 15px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      @media print { .web-report-toolbar { display: none !important; } }
+    </style>`).replace(
       "<body>",
-      `<body><div class="web-report-toolbar"><button id="tankerplan-print-button" type="button">PDF OLARAK KAYDET / YAZDIR</button></div>`
+      `<body><div class="web-report-toolbar"><button id="tankerplan-print-button" type="button">YAZDIR / PDF OLARAK KAYDET</button></div>`
     );
 
-    // iOS ana ekrana eklenmiş PWA'da otomatik/yeni pencere yazdırması
-    // güvenilir olmayabilir. Raporu ayrı sekmede tutup yazdırmayı
-    // doğrudan kullanıcının düğme dokunuşuyla başlatıyoruz.
+    // Yazdırma işlemini iOS Safari'nin yerleşik yazdırma motoruna bırak.
+    // Böylece tablo CSS'i kaybolmaz ve html2canvas kaynaklı boş sayfa oluşmaz.
     const reportWindow = window.open("", "_blank");
     if (!reportWindow) {
-      window.alert(
-        "Rapor açılamadı. iPhone'da Safari ayarlarından açılır pencerelere izin verip tekrar deneyin."
-      );
+      window.alert("Rapor açılamadı. Safari'de açılır pencerelere izin verip tekrar deneyin.");
       return;
     }
 
@@ -1229,75 +1225,10 @@ async function deleteVehicle(vehicle) {
     const attachPrintAction = () => {
       const printButton = reportWindow.document.getElementById("tankerplan-print-button");
       if (!printButton || printButton.dataset.printBound === "1") return;
-
       printButton.dataset.printBound = "1";
-      let generatedPdfFile = null;
-
-      printButton.addEventListener("click", async () => {
-        if (!generatedPdfFile) {
-          printButton.disabled = true;
-          printButton.textContent = "PDF HAZIRLANIYOR…";
-          const toolbar = reportWindow.document.querySelector(".web-report-toolbar");
-          const previousToolbarDisplay = toolbar ? toolbar.style.display : "";
-          try {
-            // PDF, görünür ve stilleri uygulanmış rapor gövdesinden üretilir.
-            if (toolbar) toolbar.style.display = "none";
-            const pdfBlob = await html2pdf()
-              .set({
-                margin: 5,
-                filename: "TankerPlan-Yukleme-Raporu.pdf",
-                image: { type: "jpeg", quality: 0.98 },
-                html2canvas: {
-                  scale: 1.1,
-                  useCORS: true,
-                  backgroundColor: "#ffffff",
-                  scrollY: 0
-                },
-                jsPDF: { unit: "mm", format: "a4", orientation: "landscape" },
-                pagebreak: { mode: ["css", "legacy"] }
-              })
-              .from(reportWindow.document.body)
-              .outputPdf("blob");
-
-            if (!(pdfBlob instanceof Blob) || pdfBlob.size === 0) {
-              throw new Error("PDF dosyası boş oluşturuldu.");
-            }
-
-            const safePlate = (reportWindow.document.title || "TankerPlan")
-              .replace(/[^a-z0-9-_]/gi, "-");
-            generatedPdfFile = new File(
-              [pdfBlob],
-              safePlate + "-Yukleme-Raporu.pdf",
-              { type: "application/pdf" }
-            );
-
-            // iOS paylaşım izni, yeni bir kullanıcı dokunuşu gerektirebilir.
-            printButton.disabled = false;
-            printButton.textContent = "PDF'Yİ PAYLAŞ / KAYDET";
-            reportWindow.alert("PDF hazır. Paylaşmak veya Dosyalar'a kaydetmek için düğmeye bir kez daha basın.");
-          } catch (error) {
-            console.error("PDF oluşturma hatası:", error);
-            reportWindow.alert("PDF oluşturma hatası: " + (error?.message || String(error)));
-            printButton.disabled = false;
-            printButton.textContent = "PDF OLUŞTURMAYI TEKRAR DENE";
-          } finally {
-            if (toolbar) toolbar.style.display = previousToolbarDisplay;
-          }
-          return;
-        }
-
-        try {
-          // Paylaşım API'si iOS'ta açılır rapor penceresinde engellenebiliyor.
-          // PDF'yi aynı sekmede Safari'nin yerleşik PDF görüntüleyicisine aç.
-          const pdfUrl = URL.createObjectURL(generatedPdfFile);
-          reportWindow.document.body.innerHTML = "";
-          reportWindow.document.title = generatedPdfFile.name;
-          reportWindow.location.replace(pdfUrl);
-          // URL'yi hemen iptal etmiyoruz; Safari PDF görüntüleyicisi dosyayı okumalı.
-        } catch (error) {
-          console.error("PDF açma hatası:", error);
-          reportWindow.alert("PDF açılamadı: " + (error?.message || String(error)));
-        }
+      printButton.addEventListener("click", () => {
+        reportWindow.focus();
+        reportWindow.print();
       });
     };
 
