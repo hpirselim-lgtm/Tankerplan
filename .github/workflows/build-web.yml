@@ -9,6 +9,7 @@ on:
       - "package.json"
       - "package-lock.json"
       - "assets/**"
+      - "public/**"
       - ".github/workflows/build-web.yml"
   workflow_dispatch:
 
