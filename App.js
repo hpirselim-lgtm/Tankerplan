@@ -1179,12 +1179,23 @@ async function deleteVehicle(vehicle) {
     const toolbar = `
       <div class="web-report-toolbar" style="position:sticky;top:0;z-index:99999;display:flex;justify-content:center;padding:12px;background:#102d45">
         <button id="tankerplan-pdf-button" type="button" style="border:0;border-radius:7px;padding:14px 20px;color:#fff;background:#147b57;font-size:16px;font-weight:700">
-          PDF OLUŞTUR / YAZDIR
+          YAZDIR / PDF KAYDET
         </button>
       </div>`;
     let html = reportHtml.replace("</style>", `
       .web-report-toolbar button:disabled { opacity: .7; }
-      @media print { .web-report-toolbar { display: none !important; } }
+      table { display: table !important; width: 100% !important; border-collapse: collapse !important; table-layout: fixed !important; }
+      thead { display: table-header-group !important; }
+      tbody { display: table-row-group !important; }
+      tr { display: table-row !important; break-inside: avoid !important; page-break-inside: avoid !important; }
+      th, td { display: table-cell !important; border: 1px solid #8999a5 !important; padding: 6px !important; vertical-align: middle !important; }
+      @media print {
+        .web-report-toolbar { display: none !important; }
+        html, body { width: 100% !important; margin: 0 !important; padding: 0 !important; }
+        table { display: table !important; width: 100% !important; }
+        thead { display: table-header-group !important; }
+        tr { break-inside: avoid !important; page-break-inside: avoid !important; }
+      }
     </style>`);
     html = html.replace(/<body[^>]*>/i, (match) => match + toolbar);
 
@@ -1198,38 +1209,20 @@ async function deleteVehicle(vehicle) {
     reportWindow.document.write(html);
     reportWindow.document.close();
 
-    // Buton belge yüklenmeden önce/sonra eklenmiş olsa da tıklamayı yakala.
-    reportWindow.document.addEventListener("click", async (event) => {
-      const button = event.target && event.target.closest
-        ? event.target.closest("#tankerplan-pdf-button")
+    // Tarayıcının kendi yazdırma motoru HTML tablolarını korur.
+    reportWindow.document.addEventListener("click", (event) => {
+      const target = event.target && event.target.nodeType === 3
+        ? event.target.parentElement
+        : event.target;
+      const button = target && target.closest
+        ? target.closest("#tankerplan-pdf-button")
         : null;
-      if (!button || button.dataset.busy === "1") return;
+      if (!button) return;
       event.preventDefault();
-      button.dataset.busy = "1";
-      button.textContent = "PDF HAZIRLANIYOR...";
       const reportToolbar = reportWindow.document.querySelector(".web-report-toolbar");
       if (reportToolbar) reportToolbar.style.display = "none";
-      try {
-        const blob = await html2pdf()
-          .set({
-            margin: [8, 8, 8, 8],
-            filename: "TankerPlan-Yukleme-Raporu.pdf",
-            image: { type: "jpeg", quality: 0.98 },
-            html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff", logging: false },
-            jsPDF: { unit: "mm", format: "a4", orientation: "landscape" },
-            pagebreak: { mode: ["css", "legacy"], avoid: ["tr", "thead", "h2", ".summary", ".warning", "footer"] },
-          })
-          .from(reportWindow.document.body)
-          .outputPdf("blob");
-        const pdfUrl = URL.createObjectURL(blob);
-        reportWindow.location.href = pdfUrl;
-      } catch (error) {
-        console.error("TankerPlan PDF error:", error);
-        if (reportToolbar) reportToolbar.style.display = "flex";
-        button.dataset.busy = "0";
-        button.textContent = "TEKRAR DENE";
-        reportWindow.alert("PDF oluşturulamadı: " + (error && error.message ? error.message : "Bilinmeyen hata"));
-      }
+      reportWindow.focus();
+      reportWindow.print();
     }, true);
   }
 
