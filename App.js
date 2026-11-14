@@ -1049,22 +1049,42 @@ async function deleteVehicle(vehicle) {
     const html = getPlanReportHtml().replace(
       "</style>",
       `
-        .web-report-toolbar { position: sticky; top: 0; z-index: 10; display: flex; justify-content: center; gap: 10px; padding: 12px; background: #102d45; }
-        .web-report-toolbar button { border: 0; border-radius: 7px; padding: 11px 16px; color: #fff; background: #147b57; font-size: 14px; font-weight: 700; }
-        @media print { .web-report-toolbar { display: none !important; } }
+        .web-report-toolbar {
+          position: sticky;
+          top: 0;
+          z-index: 10;
+          display: flex;
+          justify-content: center;
+          gap: 10px;
+          padding: 12px;
+          background: #102d45;
+        }
+        .web-report-toolbar button {
+          border: 0;
+          border-radius: 7px;
+          padding: 11px 16px;
+          color: #fff;
+          background: #147b57;
+          font-size: 14px;
+          font-weight: 700;
+          cursor: pointer;
+        }
+        @media print {
+          .web-report-toolbar { display: none !important; }
+        }
       </style>`
     ).replace(
       "<body>",
-      `<body><div class="web-report-toolbar"><button onclick="window.print()">PDF OLARAK KAYDET / YAZDIR</button></div>`
+      `<body><div class="web-report-toolbar"><button id="tankerplan-print-button" type="button">PDF OLARAK KAYDET / YAZDIR</button></div>`
     );
 
-    // Açılır pencere doğrudan kullanıcı dokunuşu sırasında oluşturulur;
-    // böylece iOS/Safari açılır pencere engeline takılma olasılığı azalır.
+    // iOS ana ekrana eklenmiş PWA'da otomatik/yeni pencere yazdırması
+    // güvenilir olmayabilir. Raporu ayrı sekmede tutup yazdırmayı
+    // doğrudan kullanıcının düğme dokunuşuyla başlatıyoruz.
     const reportWindow = window.open("", "_blank");
     if (!reportWindow) {
-      Alert.alert(
-        "Rapor açılamadı",
-        "Tarayıcı yeni pencereyi engelledi. TankerPlan'ı Safari'de açıp tekrar deneyin."
+      window.alert(
+        "Rapor açılamadı. iPhone'da Safari ayarlarından açılır pencerelere izin verip tekrar deneyin."
       );
       return;
     }
@@ -1072,17 +1092,28 @@ async function deleteVehicle(vehicle) {
     reportWindow.document.open();
     reportWindow.document.write(html);
     reportWindow.document.close();
-    reportWindow.focus();
 
-    // Yazdırma penceresi açılamazsa rapor yeni sekmede kalır;
-    // üstteki düğme ile kullanıcı yeniden başlatabilir.
-    window.setTimeout(() => {
-      try {
-        reportWindow.print();
-      } catch (error) {
-        console.warn("Otomatik yazdırma başlatılamadı:", error);
-      }
-    }, 700);
+    const attachPrintAction = () => {
+      const printButton = reportWindow.document.getElementById("tankerplan-print-button");
+      if (!printButton || printButton.dataset.printBound === "1") return;
+
+      printButton.dataset.printBound = "1";
+      printButton.addEventListener("click", () => {
+        try {
+          reportWindow.focus();
+          // print() doğrudan gerçek kullanıcı dokunuşu içinde çağrılır.
+          reportWindow.print();
+        } catch (error) {
+          console.error("Yazdırma başlatılamadı:", error);
+          reportWindow.alert(
+            "Yazdırma başlatılamadı. Raporu Safari'de açıp Paylaş menüsünden Yazdır seçeneğini deneyin."
+          );
+        }
+      });
+    };
+
+    attachPrintAction();
+    reportWindow.addEventListener("load", attachPrintAction);
   }
 
   async function savePlanPdf() {
