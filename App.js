@@ -674,15 +674,22 @@ export default function App() {
 
   async function loadLoadingHistory() {
     try {
-      const saved = await AsyncStorage.getItem(HISTORY_STORAGE_KEY);
-      if (saved) setLoadingHistory(JSON.parse(saved));
+      let saved = null;
+      // Web/PWA'da geçmişi doğrudan aynı cihazın localStorage alanından oku.
+      if (Platform.OS === "web" && typeof window !== "undefined") {
+        saved = window.localStorage.getItem(HISTORY_STORAGE_KEY);
+      }
+      if (!saved) saved = await AsyncStorage.getItem(HISTORY_STORAGE_KEY);
+      const parsed = saved ? JSON.parse(saved) : [];
+      setLoadingHistory(Array.isArray(parsed) ? parsed : []);
     } catch (error) {
       console.error("Geçmiş yüklemeler okunamadı:", error);
+      setLoadingHistory([]);
     }
   }
 
   async function saveHistoryRecord(nextPlan) {
-    if (!nextPlan) return;
+    if (!nextPlan) return false;
     const record = {
       id: makeId(),
       createdAt: new Date().toISOString(),
@@ -692,12 +699,33 @@ export default function App() {
       plan: JSON.parse(JSON.stringify(nextPlan)),
       eyes: JSON.parse(JSON.stringify(eyes)),
     };
-    const nextHistory = [record, ...loadingHistory].slice(0, 100);
     try {
-      await AsyncStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(nextHistory));
+      // Ekrandaki state yerine önce cihazdaki son kaydı oku; böylece hızlı
+      // arka arkaya yapılan yüklemelerde eski kayıtların üzerine yazılmaz.
+      let saved = null;
+      if (Platform.OS === "web" && typeof window !== "undefined") {
+        saved = window.localStorage.getItem(HISTORY_STORAGE_KEY);
+      }
+      if (!saved) saved = await AsyncStorage.getItem(HISTORY_STORAGE_KEY);
+      const existing = saved ? JSON.parse(saved) : [];
+      const nextHistory = [record, ...(Array.isArray(existing) ? existing : [])]
+        .slice(0, 100);
+      const serialized = JSON.stringify(nextHistory);
+      if (Platform.OS === "web" && typeof window !== "undefined") {
+        window.localStorage.setItem(HISTORY_STORAGE_KEY, serialized);
+      } else {
+        await AsyncStorage.setItem(HISTORY_STORAGE_KEY, serialized);
+      }
       setLoadingHistory(nextHistory);
+      return true;
     } catch (error) {
-      Alert.alert("Kayıt hatası", "Yükleme geçmişi telefon hafızasına kaydedilemedi.");
+      console.error("Yükleme geçmişi kaydedilemedi:", error);
+      if (Platform.OS === "web" && typeof window !== "undefined") {
+        window.alert("Yükleme kaydedilemedi. Tarayıcı depolama alanını kontrol edin.");
+      } else {
+        Alert.alert("Kayıt hatası", "Yükleme geçmişi telefon hafızasına kaydedilemedi.");
+      }
+      return false;
     }
   }
 
@@ -1220,7 +1248,7 @@ async function deleteVehicle(vehicle) {
                 filename: "TankerPlan-Yukleme-Raporu.pdf",
                 image: { type: "jpeg", quality: 0.98 },
                 html2canvas: {
-                  scale: 1.25,
+                  scale: 1.1,
                   useCORS: true,
                   backgroundColor: "#ffffff",
                   scrollY: 0
