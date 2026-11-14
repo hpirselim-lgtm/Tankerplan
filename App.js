@@ -16,6 +16,7 @@ import * as Sharing from "expo-sharing";
 import html2pdf from "html2pdf.js";
 
 const STORAGE_KEY = "TANKERPLAN_VEHICLES_V1";
+const HISTORY_STORAGE_KEY = "TANKERPLAN_LOADING_HISTORY_V1";
 
 const CATALOG = {
   Shell: ["V-Power Diesel", "V-Power Kurşunsuz 95"],
@@ -621,6 +622,7 @@ function createLoadingPlan(eyes, dealers) {
 
 export default function App() {
   const [vehicles, setVehicles] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState([]);
   const [plate, setPlate] = useState("");
   const [trailerPlate, setTrailerPlate] = useState("");
   const [vehicleType, setVehicleType] = useState("tractor_semitrailer");
@@ -636,6 +638,7 @@ export default function App() {
 
   useEffect(() => {
     loadVehicles();
+    loadLoadingHistory();
 
     // iPhone Safari'de klavye açıldığında yatay taşmayı engelle.
     if (Platform.OS === "web" && typeof document !== "undefined") {
@@ -666,6 +669,88 @@ export default function App() {
       Alert.alert("Hata", "Araç kayıtları okunamadı.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function loadLoadingHistory() {
+    try {
+      const saved = await AsyncStorage.getItem(HISTORY_STORAGE_KEY);
+      if (saved) setLoadingHistory(JSON.parse(saved));
+    } catch (error) {
+      console.error("Geçmiş yüklemeler okunamadı:", error);
+    }
+  }
+
+  async function saveHistoryRecord(nextPlan) {
+    if (!nextPlan) return;
+    const record = {
+      id: makeId(),
+      createdAt: new Date().toISOString(),
+      plate,
+      trailerPlate,
+      vehicleType,
+      plan: JSON.parse(JSON.stringify(nextPlan)),
+      eyes: JSON.parse(JSON.stringify(eyes)),
+    };
+    const nextHistory = [record, ...loadingHistory].slice(0, 100);
+    try {
+      await AsyncStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(nextHistory));
+      setLoadingHistory(nextHistory);
+    } catch (error) {
+      Alert.alert("Kayıt hatası", "Yükleme geçmişi telefon hafızasına kaydedilemedi.");
+    }
+  }
+
+  async function deleteHistoryRecord(recordId) {
+    const nextHistory = loadingHistory.filter((item) => item.id !== recordId);
+    try {
+      await AsyncStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(nextHistory));
+      setLoadingHistory(nextHistory);
+    } catch (error) {
+      Alert.alert("Hata", "Geçmiş kaydı silinemedi.");
+    }
+  }
+
+  function confirmDeleteHistory(record) {
+    const remove = () => deleteHistoryRecord(record.id);
+    if (Platform.OS === "web") {
+      if (window.confirm("Bu yükleme kaydını silmek istiyor musunuz?")) remove();
+    } else {
+      Alert.alert("Kaydı sil", "Bu yükleme geçmişten silinecek. Emin misiniz?", [
+        { text: "Vazgeç", style: "cancel" },
+        { text: "Sil", style: "destructive", onPress: remove },
+      ]);
+    }
+  }
+
+  async function openHistoryReport(record) {
+    const html = createPlanReportHtml({
+      plan: record.plan,
+      plate: record.plate,
+      trailerPlate: record.trailerPlate,
+      vehicleType: record.vehicleType,
+      eyes: record.eyes,
+    });
+    if (Platform.OS === "web") {
+      const reportWindow = window.open("", "_blank");
+      if (!reportWindow) {
+        window.alert("Rapor açılamadı. Açılır pencerelere izin verip tekrar deneyin.");
+        return;
+      }
+      const printableHtml = html.replace("</style>",
+        ".history-print-toolbar{position:sticky;top:0;background:#102d45;padding:10px;text-align:center}.history-print-toolbar button{background:#147b57;color:#fff;border:0;border-radius:6px;padding:10px 16px;font-weight:700}@media print{.history-print-toolbar{display:none!important}}</style>"
+      ).replace("<body>",
+        '<body><div class="history-print-toolbar"><button onclick="window.print()">YAZDIR / PDF OLARAK KAYDET</button></div>'
+      );
+      reportWindow.document.open();
+      reportWindow.document.write(printableHtml);
+      reportWindow.document.close();
+      return;
+    }
+    try {
+      await Print.printAsync({ html });
+    } catch (error) {
+      Alert.alert("Rapor açılamadı", "Lütfen tekrar deneyin.");
     }
   }
 
@@ -1006,7 +1091,9 @@ async function deleteVehicle(vehicle) {
 
     setSelectedCutTaskId("");
     setCutSummary(null);
-    setPlan(createLoadingPlan(eyes, dealers));
+    const nextPlan = createLoadingPlan(eyes, dealers);
+    setPlan(nextPlan);
+    saveHistoryRecord(nextPlan);
   }
 
   function applyPayloadCut() {
@@ -1048,6 +1135,7 @@ async function deleteVehicle(vehicle) {
     }
     setDealers(nextDealers);
     setPlan(nextPlan);
+    saveHistoryRecord(nextPlan);
     setCutSummary({ product: selectedTask.product, liters: totalCutLiters, withinLimit: nextPlan.totalMassKg <= payloadKg });
   }
 
@@ -1874,6 +1962,51 @@ async function deleteVehicle(vehicle) {
           </View>
         )}
 
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>5. Geçmiş Yüklemeler</Text>
+          <Text style={styles.muted}>
+            Son 100 yükleme kaydı bu cihazda saklanır.
+          </Text>
+          {loadingHistory.length === 0 ? (
+            <Text style={styles.emptyText}>Henüz kayıtlı yükleme bulunmuyor. Bir yükleme planı oluşturduğunuzda burada görünecek.</Text>
+          ) : (
+            loadingHistory.map((record) => (
+              <View key={record.id} style={styles.historyItem}>
+                <View style={styles.historyDetails}>
+                  <Text style={styles.historyTitle}>
+                    {record.plate || "Plaka girilmemiş"}
+                    {record.vehicleType === "tractor_semitrailer" && record.trailerPlate
+                      ? " · " + record.trailerPlate : ""}
+                  </Text>
+                  <Text style={styles.muted}>
+                    {new Date(record.createdAt).toLocaleString("tr-TR")}
+                  </Text>
+                  <Text style={styles.historyLiters}>
+                    {formatLiters(record.plan.totalLoaded)} L yüklendi
+                  </Text>
+                  <Text style={styles.muted}>
+                    {record.plan.allocations.length} göz · {record.plan.tasks.length} ürün talebi
+                  </Text>
+                </View>
+                <View style={styles.historyActions}>
+                  <TouchableOpacity
+                    style={styles.historyOpenButton}
+                    onPress={() => openHistoryReport(record)}
+                  >
+                    <Text style={styles.buttonText}>RAPORU AÇ</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.historyDeleteButton}
+                    onPress={() => confirmDeleteHistory(record)}
+                  >
+                    <Text style={styles.buttonText}>SİL</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))
+          )}
+        </View>
+
         <Text style={styles.footer}>
           TANKERPLAN · Tasarım ve Geliştirme: Halim Pirselimoğlu
         </Text>
@@ -2389,6 +2522,18 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     marginTop: 14,
   },
+  historyItem: {
+    borderBottomWidth: 1,
+    borderBottomColor: "#e7edf1",
+    paddingVertical: 12,
+    gap: 8,
+  },
+  historyDetails: { flex: 1, minWidth: 0 },
+  historyTitle: { color: "#17364d", fontSize: 14, fontWeight: "800" },
+  historyLiters: { color: "#147b57", fontSize: 13, fontWeight: "800", marginTop: 4 },
+  historyActions: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
+  historyOpenButton: { backgroundColor: "#147b57", borderRadius: 7, paddingVertical: 9, paddingHorizontal: 12 },
+  historyDeleteButton: { backgroundColor: "#b42318", borderRadius: 7, paddingVertical: 9, paddingHorizontal: 12 },
   footer: {
     textAlign: "center",
     color: "#8796a0",
