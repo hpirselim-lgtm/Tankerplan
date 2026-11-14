@@ -120,25 +120,41 @@ function createPlanReportHtml({ plan, plate, trailerPlate, vehicleType, eyes }) 
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>TankerPlan Yükleme Planı - ${escapeHtml(plate || "Araç")}</title>
 <style>
-  @page { size: A4 landscape; margin: 12mm; }
-  * { box-sizing: border-box; }
-  body { font-family: Arial, Helvetica, sans-serif; color: #17364d; margin: 0; font-size: 10px; }
-  header { border-bottom: 3px solid #e11d2e; padding-bottom: 12px; margin-bottom: 14px; }
-  h1 { margin: 0; font-size: 23px; color: #102d45; }
-  .subtitle { margin-top: 4px; color: #647684; font-size: 11px; }
-  .meta { display: flex; justify-content: space-between; gap: 16px; margin: 12px 0; font-size: 11px; }
-  .summary { display: flex; gap: 8px; margin: 12px 0 16px; }
-  .summary div { flex: 1; background: #edf2f5; border-radius: 6px; padding: 9px; }
-  .summary b { display: block; font-size: 15px; margin-top: 4px; color: #102d45; }
-  h2 { font-size: 13px; margin: 16px 0 7px; color: #102d45; }
-  table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
-  th { background: #102d45; color: white; text-align: left; }
-  th, td { border: 1px solid #d8e0e6; padding: 6px; vertical-align: top; }
-  tr { page-break-inside: avoid; }
-  .number { text-align: right; white-space: nowrap; }
-  .warning { background: #fff5e8; border: 1px solid #f1d3a9; padding: 8px; border-radius: 5px; margin-top: 8px; }
-  .note { color: #647684; font-size: 9px; line-height: 1.5; margin-top: 14px; }
-  footer { border-top: 1px solid #d8e0e6; padding-top: 8px; margin-top: 18px; color: #647684; font-size: 9px; }
+  @page { size: A4 landscape; margin: 6mm; }
+  * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  html, body { width: 100%; margin: 0; padding: 0; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #17364d; font-size: 8px; line-height: 1.22; }
+  header { border-bottom: 2px solid #e11d2e; padding: 0 0 5px; margin: 0 0 6px; }
+  h1 { margin: 0; font-size: 18px; color: #102d45; line-height: 1.1; }
+  .subtitle { margin-top: 2px; color: #647684; font-size: 8px; }
+  .meta { display: flex; justify-content: space-between; gap: 10px; margin: 5px 0 6px; font-size: 8px; }
+  .summary { display: flex; gap: 5px; margin: 5px 0 8px; }
+  .summary div { flex: 1; min-width: 0; background: #edf2f5; border: 1px solid #e0e7ed; border-radius: 4px; padding: 5px 6px; font-size: 7px; }
+  .summary b { display: block; font-size: 11px; margin-top: 2px; color: #102d45; white-space: nowrap; }
+  h2 { font-size: 10px; margin: 8px 0 4px; color: #102d45; page-break-after: avoid; }
+  table { width: 100%; border-collapse: collapse; margin: 0 0 6px; table-layout: fixed; page-break-inside: auto; }
+  thead { display: table-header-group; }
+  th { background: #102d45; color: #fff; text-align: left; font-size: 7px; font-weight: 700; }
+  th, td { border: 1px solid #d8e0e6; padding: 3px 4px; vertical-align: middle; overflow-wrap: anywhere; }
+  td { font-size: 7px; }
+  tr { page-break-inside: avoid; break-inside: avoid; }
+  .number { text-align: right; white-space: nowrap; overflow-wrap: normal; font-variant-numeric: tabular-nums; }
+  table:first-of-type th:nth-child(1), table:first-of-type td:nth-child(1) { width: 6%; }
+  table:first-of-type th:nth-child(2), table:first-of-type td:nth-child(2) { width: 12%; }
+  table:first-of-type th:nth-child(3), table:first-of-type td:nth-child(3) { width: 12%; }
+  table:first-of-type th:nth-child(4), table:first-of-type td:nth-child(4) { width: 20%; }
+  table:first-of-type th:nth-child(5), table:first-of-type td:nth-child(5) { width: 11%; }
+  table:first-of-type th:nth-child(6), table:first-of-type td:nth-child(6) { width: 13%; }
+  table:first-of-type th:nth-child(7), table:first-of-type td:nth-child(7) { width: 11%; }
+  table:first-of-type th:nth-child(8), table:first-of-type td:nth-child(8) { width: 15%; }
+  .warning { background: #fff5e8; border: 1px solid #f1d3a9; padding: 5px 7px; border-radius: 4px; margin-top: 5px; font-size: 7px; }
+  .note { color: #647684; font-size: 6.5px; line-height: 1.3; margin: 6px 0 0; }
+  footer { border-top: 1px solid #d8e0e6; padding-top: 4px; margin-top: 6px; color: #647684; font-size: 7px; }
+  @media print {
+    html, body { width: 100%; height: auto; }
+    body { margin: 0; }
+    h2, table, .warning, footer { page-break-inside: avoid; }
+  }
 </style>
 </head>
 <body>
@@ -1112,11 +1128,11 @@ async function deleteVehicle(vehicle) {
             if (toolbar) toolbar.style.display = "none";
             const pdfBlob = await html2pdf()
               .set({
-                margin: 10,
+                margin: 5,
                 filename: "TankerPlan-Yukleme-Raporu.pdf",
                 image: { type: "jpeg", quality: 0.98 },
                 html2canvas: {
-                  scale: 1.5,
+                  scale: 1.25,
                   useCORS: true,
                   backgroundColor: "#ffffff",
                   scrollY: 0
