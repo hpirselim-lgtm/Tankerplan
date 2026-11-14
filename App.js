@@ -13,6 +13,7 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
+import html2pdf from "html2pdf.js";
 
 const STORAGE_KEY = "TANKERPLAN_VEHICLES_V1";
 
@@ -1098,16 +1099,61 @@ async function deleteVehicle(vehicle) {
       if (!printButton || printButton.dataset.printBound === "1") return;
 
       printButton.dataset.printBound = "1";
-      printButton.addEventListener("click", () => {
+      printButton.addEventListener("click", async () => {
+        const originalLabel = printButton.textContent;
+        printButton.disabled = true;
+        printButton.textContent = "PDF HAZIRLANIYOR…";
         try {
-          reportWindow.focus();
-          // print() doğrudan gerçek kullanıcı dokunuşu içinde çağrılır.
-          reportWindow.print();
+          const reportBody = reportWindow.document.body.cloneNode(true);
+          const toolbar = reportBody.querySelector(".web-report-toolbar");
+          if (toolbar) toolbar.remove();
+
+          const pdfBlob = await html2pdf()
+            .set({
+              margin: 10,
+              filename: "TankerPlan-Yukleme-Raporu.pdf",
+              image: { type: "jpeg", quality: 0.98 },
+              html2canvas: {
+                scale: 2,
+                useCORS: true,
+                backgroundColor: "#ffffff",
+                scrollY: 0
+              },
+              jsPDF: { unit: "mm", format: "a4", orientation: "landscape" },
+              pagebreak: { mode: ["css", "legacy"] }
+            })
+            .from(reportBody)
+            .outputPdf("blob");
+
+          const safePlate = (reportWindow.document.title || "TankerPlan")
+            .replace(/[^a-z0-9-_]/gi, "-");
+          const file = new File([pdfBlob], safePlate + "-Yukleme-Raporu.pdf", {
+            type: "application/pdf"
+          });
+
+          if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({
+              files: [file],
+              title: "TankerPlan yükleme raporu",
+              text: "Yükleme planı PDF raporu"
+            });
+          } else {
+            const url = URL.createObjectURL(pdfBlob);
+            const link = reportWindow.document.createElement("a");
+            link.href = url;
+            link.download = file.name;
+            reportWindow.document.body.appendChild(link);
+            link.click();
+            link.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 60000);
+            reportWindow.alert("PDF indirilmeye hazır. iPhone'da Dosyalar uygulamasındaki İndirilenler klasörünü kontrol edin.");
+          }
         } catch (error) {
-          console.error("Yazdırma başlatılamadı:", error);
-          reportWindow.alert(
-            "Yazdırma başlatılamadı. Raporu Safari'de açıp Paylaş menüsünden Yazdır seçeneğini deneyin."
-          );
+          console.error("PDF oluşturma/paylaşma hatası:", error);
+          reportWindow.alert("PDF oluşturulamadı veya paylaşım iptal edildi. Tekrar deneyin.");
+        } finally {
+          printButton.disabled = false;
+          printButton.textContent = originalLabel;
         }
       });
     };
