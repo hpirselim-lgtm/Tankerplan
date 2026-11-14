@@ -1,5 +1,5 @@
 
-const CACHE_NAME = "tankerplan-v2";
+const CACHE_NAME = "tankerplan-v3";
 
 const APP_FILES = [
   "/",
