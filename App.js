@@ -91,20 +91,17 @@ function createPlanReportHtml({ plan, plate, trailerPlate, vehicleType, eyes }) 
 
   const allocationRows = plan.allocations.map((item) => `
     <tr>
-      <td>${item.eyeNumber}. Göz</td>
-      <td>${escapeHtml(item.company)}</td>
-      <td>${escapeHtml(item.dealer)}</td>
+      <td class="center">${item.eyeNumber}. Göz</td>
+      <td>${escapeHtml(item.company)}<small>${escapeHtml(item.dealer)}</small></td>
       <td>${escapeHtml(item.product)}</td>
-      <td class="number">${formatLiters(item.loaded)} L</td>
-      <td class="number">${formatLiters(item.capacity)} L</td>
+      <td class="number">${formatLiters(item.loaded)} L<small>/ ${formatLiters(item.capacity)} L kapasite</small></td>
       <td class="number">${Number(item.densityKgPerL).toLocaleString("tr-TR")} kg/L</td>
       <td class="number">${formatLiters(Math.round(item.loaded * item.densityKgPerL))} kg</td>
     </tr>`).join("");
 
   const taskRows = plan.tasks.map((task) => `
     <tr>
-      <td>${escapeHtml(task.company)}</td>
-      <td>${escapeHtml(task.dealer)}</td>
+      <td>${escapeHtml(task.company)}<small>${escapeHtml(task.dealer)}</small></td>
       <td>${escapeHtml(task.product)}</td>
       <td class="number">${formatLiters(task.demand)} L</td>
       <td class="number">${formatLiters(task.remaining)} L</td>
@@ -121,46 +118,40 @@ function createPlanReportHtml({ plan, plate, trailerPlate, vehicleType, eyes }) 
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>TankerPlan Yükleme Planı - ${escapeHtml(plate || "Araç")}</title>
 <style>
-  @page { size: A4 landscape; margin: 9mm; }
+  @page { size: A4 portrait; margin: 10mm; }
   * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   html, body { width: 100%; min-height: 0; margin: 0; padding: 0; }
-  body { font-family: Arial, Helvetica, sans-serif; color: #17364d; font-size: 10px; line-height: 1.35; }
-  header { border-bottom: 2px solid #e11d2e; padding: 0 0 7px; margin: 0 0 8px; }
-  h1 { margin: 0; font-size: 21px; color: #102d45; line-height: 1.15; }
-  .subtitle { margin-top: 3px; color: #647684; font-size: 10px; }
-  .meta { display: flex; justify-content: space-between; gap: 12px; margin: 7px 0; font-size: 9px; }
-  .summary { display: flex; gap: 7px; margin: 7px 0 10px; break-inside: avoid; page-break-inside: avoid; }
-  .summary div { flex: 1; min-width: 0; background: #edf2f5; border: 1px solid #cbd6de; border-radius: 4px; padding: 7px; font-size: 8px; }
-  .summary b { display: block; font-size: 12px; margin-top: 3px; color: #102d45; white-space: nowrap; }
-  h2 { font-size: 12px; margin: 10px 0 5px; color: #102d45; break-after: avoid; page-break-after: avoid; }
-  table { width: 100%; border-collapse: collapse; margin: 0 0 9px; table-layout: fixed; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #17364d; font-size: 11px; line-height: 1.4; }
+  header { border-bottom: 2px solid #e11d2e; padding: 0 0 8px; margin: 0 0 10px; }
+  h1 { margin: 0; font-size: 23px; color: #102d45; line-height: 1.15; }
+  .subtitle { margin-top: 3px; color: #647684; font-size: 11px; }
+  .meta { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px; margin: 8px 0; font-size: 10px; }
+  .summary { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 12px; break-inside: avoid; page-break-inside: avoid; }
+  .summary div { flex: 1 1 30%; min-width: 0; background: #edf2f5; border: 1px solid #cbd6de; border-radius: 4px; padding: 7px; font-size: 9px; }
+  .summary b { display: block; font-size: 12px; margin-top: 3px; color: #102d45; }
+  h2 { font-size: 14px; margin: 12px 0 6px; color: #102d45; break-after: avoid; page-break-after: avoid; }
+  table { width: 100%; border-collapse: collapse; margin: 0 0 11px; table-layout: fixed; }
   thead { display: table-header-group; }
   th { background: #102d45 !important; color: #fff !important; text-align: left; font-size: 9px; font-weight: 700; }
-  th, td { border: 1px solid #9eacb7; padding: 5px 6px; vertical-align: middle; overflow-wrap: break-word; }
-  td { font-size: 9px; }
+  th, td { border: 1px solid #8999a5 !important; padding: 6px 5px; vertical-align: middle; overflow-wrap: anywhere; }
+  td { font-size: 10px; }
+  td small { display: block; margin-top: 2px; color: #526675; font-size: 8px; }
   tr { break-inside: avoid; page-break-inside: avoid; }
-  .number { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
-  table:first-of-type th:nth-child(1), table:first-of-type td:nth-child(1) { width: 6%; }
-  table:first-of-type th:nth-child(2), table:first-of-type td:nth-child(2) { width: 12%; }
-  table:first-of-type th:nth-child(3), table:first-of-type td:nth-child(3) { width: 12%; }
-  table:first-of-type th:nth-child(4), table:first-of-type td:nth-child(4) { width: 20%; }
-  table:first-of-type th:nth-child(5), table:first-of-type td:nth-child(5) { width: 11%; }
-  table:first-of-type th:nth-child(6), table:first-of-type td:nth-child(6) { width: 13%; }
-  table:first-of-type th:nth-child(7), table:first-of-type td:nth-child(7) { width: 11%; }
-  table:first-of-type th:nth-child(8), table:first-of-type td:nth-child(8) { width: 15%; }
-  .warning { background: #fff5e8; border: 1px solid #e5c28e; padding: 7px 9px; border-radius: 4px; margin-top: 6px; font-size: 9px; break-inside: avoid; page-break-inside: avoid; }
-  .note { color: #526675; font-size: 8px; line-height: 1.4; margin: 8px 0 0; }
-  footer { border-top: 1px solid #b9c5cd; padding-top: 6px; margin-top: 8px; color: #647684; font-size: 8px; }
+  .number { text-align: right; white-space: normal; font-variant-numeric: tabular-nums; }
+  .center { text-align: center; }
+  .warning { background: #fff5e8; border: 1px solid #e5c28e; padding: 8px 9px; border-radius: 4px; margin-top: 7px; font-size: 10px; break-inside: avoid; page-break-inside: avoid; }
+  .note { color: #526675; font-size: 9px; line-height: 1.4; margin: 9px 0 0; }
+  footer { border-top: 1px solid #b9c5cd; padding-top: 7px; margin-top: 9px; color: #647684; font-size: 9px; }
   @media screen {
-    body { padding: 18px; max-width: 1200px; margin: 0 auto; }
+    body { padding: 18px; max-width: 900px; margin: 0 auto; }
   }
   @media print {
-    @page { size: A4 landscape; margin: 8mm; }
+    @page { size: A4 portrait; margin: 9mm; }
     html, body { width: auto !important; height: auto !important; min-height: 0 !important; margin: 0 !important; padding: 0 !important; }
-    body { font-size: 9px; }
+    body { font-size: 10px; }
     header, .meta, .summary, h2, .warning, .note, footer { break-inside: avoid; page-break-inside: avoid; }
-    table { width: 100%; break-inside: auto; page-break-inside: auto; }
-    thead { display: table-header-group; }
+    table { width: 100% !important; break-inside: auto; page-break-inside: auto; }
+    thead { display: table-header-group !important; }
     tr { break-inside: avoid; page-break-inside: avoid; }
     h2 { break-after: avoid; page-break-after: avoid; }
   }
@@ -181,13 +172,13 @@ function createPlanReportHtml({ plan, plate, trailerPlate, vehicleType, eyes }) 
 </div>
 <h2>Göz Bazında Yükleme Listesi</h2>
 <table>
-<thead><tr><th>Göz</th><th>Dağıtım şirketi</th><th>Bayi</th><th>Ürün</th><th class="number">Yüklenecek</th><th class="number">Göz kapasitesi</th><th class="number">Kesafet</th><th class="number">Tahmini ağırlık</th></tr></thead>
-<tbody>${allocationRows || '<tr><td colspan="8">Yükleme bulunamadı.</td></tr>'}</tbody>
+<thead><tr><th style="width:12%">Göz</th><th style="width:23%">Dağıtım şirketi / Bayi</th><th style="width:25%">Ürün</th><th style="width:17%">Yükleme / Kapasite</th><th style="width:11%">Kesafet</th><th style="width:12%">Ağırlık</th></tr></thead>
+<tbody>${allocationRows || '<tr><td colspan="6">Yükleme bulunamadı.</td></tr>'}</tbody>
 </table>
 <h2>Ürün Talep Özeti</h2>
 <table>
-<thead><tr><th>Dağıtım şirketi</th><th>Bayi</th><th>Ürün</th><th class="number">Talep</th><th class="number">Karşılanamayan</th></tr></thead>
-<tbody>${taskRows || '<tr><td colspan="5">Talep bulunamadı.</td></tr>'}</tbody>
+<thead><tr><th style="width:28%">Dağıtım şirketi / Bayi</th><th style="width:36%">Ürün</th><th style="width:18%">Talep</th><th style="width:18%">Eksik</th></tr></thead>
+<tbody>${taskRows || '<tr><td colspan="4">Talep bulunamadı.</td></tr>'}</tbody>
 </table>
 <div class="warning"><strong>Boş kalan gözler:</strong> ${escapeHtml(emptyEyes)}</div>
 ${plan.unallocated > 0 ? `<div class="warning"><strong>Uyarı:</strong> ${formatLiters(plan.unallocated)} L ürün talebi karşılanamadı.</div>` : ""}
