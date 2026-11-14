@@ -1099,61 +1099,87 @@ async function deleteVehicle(vehicle) {
       if (!printButton || printButton.dataset.printBound === "1") return;
 
       printButton.dataset.printBound = "1";
+      let generatedPdfFile = null;
+
       printButton.addEventListener("click", async () => {
-        const originalLabel = printButton.textContent;
-        printButton.disabled = true;
-        printButton.textContent = "PDF HAZIRLANIYOR…";
+        if (!generatedPdfFile) {
+          printButton.disabled = true;
+          printButton.textContent = "PDF HAZIRLANIYOR…";
+          const toolbar = reportWindow.document.querySelector(".web-report-toolbar");
+          const previousToolbarDisplay = toolbar ? toolbar.style.display : "";
+          try {
+            // PDF, görünür ve stilleri uygulanmış rapor gövdesinden üretilir.
+            if (toolbar) toolbar.style.display = "none";
+            const pdfBlob = await html2pdf()
+              .set({
+                margin: 10,
+                filename: "TankerPlan-Yukleme-Raporu.pdf",
+                image: { type: "jpeg", quality: 0.98 },
+                html2canvas: {
+                  scale: 1.5,
+                  useCORS: true,
+                  backgroundColor: "#ffffff",
+                  scrollY: 0
+                },
+                jsPDF: { unit: "mm", format: "a4", orientation: "landscape" },
+                pagebreak: { mode: ["css", "legacy"] }
+              })
+              .from(reportWindow.document.body)
+              .outputPdf("blob");
+
+            if (!(pdfBlob instanceof Blob) || pdfBlob.size === 0) {
+              throw new Error("PDF dosyası boş oluşturuldu.");
+            }
+
+            const safePlate = (reportWindow.document.title || "TankerPlan")
+              .replace(/[^a-z0-9-_]/gi, "-");
+            generatedPdfFile = new File(
+              [pdfBlob],
+              safePlate + "-Yukleme-Raporu.pdf",
+              { type: "application/pdf" }
+            );
+
+            // iOS paylaşım izni, yeni bir kullanıcı dokunuşu gerektirebilir.
+            printButton.disabled = false;
+            printButton.textContent = "PDF'Yİ PAYLAŞ / KAYDET";
+            reportWindow.alert("PDF hazır. Paylaşmak veya Dosyalar'a kaydetmek için düğmeye bir kez daha basın.");
+          } catch (error) {
+            console.error("PDF oluşturma hatası:", error);
+            reportWindow.alert("PDF oluşturma hatası: " + (error?.message || String(error)));
+            printButton.disabled = false;
+            printButton.textContent = "PDF OLUŞTURMAYI TEKRAR DENE";
+          } finally {
+            if (toolbar) toolbar.style.display = previousToolbarDisplay;
+          }
+          return;
+        }
+
         try {
-          const reportBody = reportWindow.document.body.cloneNode(true);
-          const toolbar = reportBody.querySelector(".web-report-toolbar");
-          if (toolbar) toolbar.remove();
-
-          const pdfBlob = await html2pdf()
-            .set({
-              margin: 10,
-              filename: "TankerPlan-Yukleme-Raporu.pdf",
-              image: { type: "jpeg", quality: 0.98 },
-              html2canvas: {
-                scale: 2,
-                useCORS: true,
-                backgroundColor: "#ffffff",
-                scrollY: 0
-              },
-              jsPDF: { unit: "mm", format: "a4", orientation: "landscape" },
-              pagebreak: { mode: ["css", "legacy"] }
-            })
-            .from(reportBody)
-            .outputPdf("blob");
-
-          const safePlate = (reportWindow.document.title || "TankerPlan")
-            .replace(/[^a-z0-9-_]/gi, "-");
-          const file = new File([pdfBlob], safePlate + "-Yukleme-Raporu.pdf", {
-            type: "application/pdf"
-          });
-
-          if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-            await navigator.share({
-              files: [file],
+          const shareNavigator = window.navigator;
+          if (
+            shareNavigator.share &&
+            shareNavigator.canShare &&
+            shareNavigator.canShare({ files: [generatedPdfFile] })
+          ) {
+            await shareNavigator.share({
+              files: [generatedPdfFile],
               title: "TankerPlan yükleme raporu",
               text: "Yükleme planı PDF raporu"
             });
           } else {
-            const url = URL.createObjectURL(pdfBlob);
+            const url = URL.createObjectURL(generatedPdfFile);
             const link = reportWindow.document.createElement("a");
             link.href = url;
-            link.download = file.name;
+            link.download = generatedPdfFile.name;
             reportWindow.document.body.appendChild(link);
             link.click();
             link.remove();
-            setTimeout(() => URL.revokeObjectURL(url), 60000);
-            reportWindow.alert("PDF indirilmeye hazır. iPhone'da Dosyalar uygulamasındaki İndirilenler klasörünü kontrol edin.");
+            window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+            reportWindow.alert("PDF indirildi. Dosyalar uygulamasındaki İndirilenler klasörünü kontrol edin.");
           }
         } catch (error) {
-          console.error("PDF oluşturma/paylaşma hatası:", error);
-          reportWindow.alert("PDF oluşturulamadı veya paylaşım iptal edildi. Tekrar deneyin.");
-        } finally {
-          printButton.disabled = false;
-          printButton.textContent = originalLabel;
+          console.error("PDF paylaşma hatası:", error);
+          reportWindow.alert("PDF paylaşma hatası: " + (error?.message || String(error)));
         }
       });
     };
