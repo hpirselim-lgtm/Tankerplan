@@ -1176,36 +1176,18 @@ async function deleteVehicle(vehicle) {
   }
 
   function openWebPlanReport(reportHtml = getPlanReportHtml()) {
-    const html = reportHtml.replace("</style>", `
-      .web-report-toolbar {
-        position: sticky;
-        top: 0;
-        z-index: 10;
-        display: flex;
-        justify-content: center;
-        padding: 12px;
-        background: #102d45;
-      }
-      .web-report-toolbar button {
-        border: 0;
-        border-radius: 7px;
-        padding: 12px 18px;
-        color: #fff;
-        background: #147b57;
-        font-size: 15px;
-        font-weight: 700;
-        cursor: pointer;
-      }
+    const toolbar = `
+      <div class="web-report-toolbar" style="position:sticky;top:0;z-index:99999;display:flex;justify-content:center;padding:12px;background:#102d45">
+        <button id="tankerplan-pdf-button" type="button" style="border:0;border-radius:7px;padding:14px 20px;color:#fff;background:#147b57;font-size:16px;font-weight:700">
+          PDF OLUŞTUR / YAZDIR
+        </button>
+      </div>`;
+    let html = reportHtml.replace("</style>", `
       .web-report-toolbar button:disabled { opacity: .7; }
       @media print { .web-report-toolbar { display: none !important; } }
-    </style>`).replace(
-      "<body>",
-      `<body><div class="web-report-toolbar"><button id="tankerplan-pdf-button" type="button">PDF OLUŞTUR / YAZDIR</button></div>`
-    );
+    </style>`);
+    html = html.replace(/<body[^>]*>/i, (match) => match + toolbar);
 
-    // iOS uygulama içi tarayıcılarında window.print() güvenilir çalışmadığından
-    // PDF'i html2pdf ile üretip aynı sekmede açıyoruz. PDF görüntüleyicisinden
-    // Paylaş > Yazdır veya Dosyalara Kaydet kullanılabilir.
     const reportWindow = window.open("", "_blank");
     if (!reportWindow) {
       window.alert("Rapor açılamadı. Açılır pencerelere izin verip tekrar deneyin.");
@@ -1216,41 +1198,39 @@ async function deleteVehicle(vehicle) {
     reportWindow.document.write(html);
     reportWindow.document.close();
 
-    const attachPdfAction = () => {
-      const pdfButton = reportWindow.document.getElementById("tankerplan-pdf-button");
-      if (!pdfButton || pdfButton.dataset.pdfBound === "1") return;
-      pdfButton.dataset.pdfBound = "1";
-      pdfButton.addEventListener("click", async () => {
-        const toolbar = reportWindow.document.querySelector(".web-report-toolbar");
-        pdfButton.disabled = true;
-        pdfButton.textContent = "PDF HAZIRLANIYOR...";
-        if (toolbar) toolbar.style.display = "none";
-        try {
-          const blob = await html2pdf()
-            .set({
-              margin: [8, 8, 8, 8],
-              filename: "TankerPlan-Yukleme-Raporu.pdf",
-              image: { type: "jpeg", quality: 0.98 },
-              html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff", logging: false },
-              jsPDF: { unit: "mm", format: "a4", orientation: "landscape" },
-              pagebreak: { mode: ["css", "legacy"], avoid: ["tr", "thead", "h2", ".summary", ".warning", "footer"] },
-            })
-            .from(reportWindow.document.body)
-            .outputPdf("blob");
-          const pdfUrl = URL.createObjectURL(blob);
-          reportWindow.location.href = pdfUrl;
-        } catch (error) {
-          console.error("PDF oluşturma hatası:", error);
-          if (toolbar) toolbar.style.display = "flex";
-          pdfButton.disabled = false;
-          pdfButton.textContent = "TEKRAR DENE";
-          reportWindow.alert("PDF oluşturulamadı. Lütfen tekrar deneyin.");
-        }
-      });
-    };
-
-    attachPdfAction();
-    reportWindow.addEventListener("load", attachPdfAction);
+    // Buton belge yüklenmeden önce/sonra eklenmiş olsa da tıklamayı yakala.
+    reportWindow.document.addEventListener("click", async (event) => {
+      const button = event.target && event.target.closest
+        ? event.target.closest("#tankerplan-pdf-button")
+        : null;
+      if (!button || button.dataset.busy === "1") return;
+      event.preventDefault();
+      button.dataset.busy = "1";
+      button.textContent = "PDF HAZIRLANIYOR...";
+      const reportToolbar = reportWindow.document.querySelector(".web-report-toolbar");
+      if (reportToolbar) reportToolbar.style.display = "none";
+      try {
+        const blob = await html2pdf()
+          .set({
+            margin: [8, 8, 8, 8],
+            filename: "TankerPlan-Yukleme-Raporu.pdf",
+            image: { type: "jpeg", quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff", logging: false },
+            jsPDF: { unit: "mm", format: "a4", orientation: "landscape" },
+            pagebreak: { mode: ["css", "legacy"], avoid: ["tr", "thead", "h2", ".summary", ".warning", "footer"] },
+          })
+          .from(reportWindow.document.body)
+          .outputPdf("blob");
+        const pdfUrl = URL.createObjectURL(blob);
+        reportWindow.location.href = pdfUrl;
+      } catch (error) {
+        console.error("TankerPlan PDF error:", error);
+        if (reportToolbar) reportToolbar.style.display = "flex";
+        button.dataset.busy = "0";
+        button.textContent = "TEKRAR DENE";
+        reportWindow.alert("PDF oluşturulamadı: " + (error && error.message ? error.message : "Bilinmeyen hata"));
+      }
+    }, true);
   }
 
   async function savePlanPdf() {
