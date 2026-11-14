@@ -155,10 +155,13 @@ function createPlanReportHtml({ plan, plate, trailerPlate, vehicleType, eyes }) 
     body { padding: 18px; max-width: 1200px; margin: 0 auto; }
   }
   @media print {
-    html, body { width: 100%; height: auto !important; min-height: 0 !important; margin: 0 !important; padding: 0 !important; }
+    @page { size: A4 landscape; margin: 8mm; }
+    html, body { width: auto !important; height: auto !important; min-height: 0 !important; margin: 0 !important; padding: 0 !important; }
     body { font-size: 9px; }
-    .summary, .warning, footer { break-inside: avoid; page-break-inside: avoid; }
-    table { break-inside: auto; page-break-inside: auto; }
+    header, .meta, .summary, h2, .warning, .note, footer { break-inside: avoid; page-break-inside: avoid; }
+    table { width: 100%; break-inside: auto; page-break-inside: auto; }
+    thead { display: table-header-group; }
+    tr { break-inside: avoid; page-break-inside: avoid; }
     h2 { break-after: avoid; page-break-after: avoid; }
   }
 </style>
@@ -765,19 +768,8 @@ export default function App() {
       eyes: record.eyes,
     });
     if (Platform.OS === "web") {
-      const reportWindow = window.open("", "_blank");
-      if (!reportWindow) {
-        window.alert("Rapor açılamadı. Açılır pencerelere izin verip tekrar deneyin.");
-        return;
-      }
-      const printableHtml = html.replace("</style>",
-        ".history-print-toolbar{position:sticky;top:0;background:#102d45;padding:10px;text-align:center}.history-print-toolbar button{background:#147b57;color:#fff;border:0;border-radius:6px;padding:10px 16px;font-weight:700}@media print{.history-print-toolbar{display:none!important}}</style>"
-      ).replace("<body>",
-        '<body><div class="history-print-toolbar"><button onclick="window.print()">YAZDIR / PDF OLARAK KAYDET</button></div>'
-      );
-      reportWindow.document.open();
-      reportWindow.document.write(printableHtml);
-      reportWindow.document.close();
+      // Geçmiş raporu da yeni yükleme raporuyla aynı yazdırma akışını kullanır.
+      openWebPlanReport(html);
       return;
     }
     try {
@@ -1183,8 +1175,8 @@ async function deleteVehicle(vehicle) {
     });
   }
 
-  function openWebPlanReport() {
-    const html = getPlanReportHtml().replace("</style>", `
+  function openWebPlanReport(reportHtml = getPlanReportHtml()) {
+    const html = reportHtml.replace("</style>", `
       .web-report-toolbar {
         position: sticky;
         top: 0;
