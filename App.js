@@ -1155,31 +1155,16 @@ async function deleteVehicle(vehicle) {
         }
 
         try {
-          const shareNavigator = window.navigator;
-          if (
-            shareNavigator.share &&
-            shareNavigator.canShare &&
-            shareNavigator.canShare({ files: [generatedPdfFile] })
-          ) {
-            await shareNavigator.share({
-              files: [generatedPdfFile],
-              title: "TankerPlan yükleme raporu",
-              text: "Yükleme planı PDF raporu"
-            });
-          } else {
-            const url = URL.createObjectURL(generatedPdfFile);
-            const link = reportWindow.document.createElement("a");
-            link.href = url;
-            link.download = generatedPdfFile.name;
-            reportWindow.document.body.appendChild(link);
-            link.click();
-            link.remove();
-            window.setTimeout(() => URL.revokeObjectURL(url), 60000);
-            reportWindow.alert("PDF indirildi. Dosyalar uygulamasındaki İndirilenler klasörünü kontrol edin.");
-          }
+          // Paylaşım API'si iOS'ta açılır rapor penceresinde engellenebiliyor.
+          // PDF'yi aynı sekmede Safari'nin yerleşik PDF görüntüleyicisine aç.
+          const pdfUrl = URL.createObjectURL(generatedPdfFile);
+          reportWindow.document.body.innerHTML = "";
+          reportWindow.document.title = generatedPdfFile.name;
+          reportWindow.location.replace(pdfUrl);
+          // URL'yi hemen iptal etmiyoruz; Safari PDF görüntüleyicisi dosyayı okumalı.
         } catch (error) {
-          console.error("PDF paylaşma hatası:", error);
-          reportWindow.alert("PDF paylaşma hatası: " + (error?.message || String(error)));
+          console.error("PDF açma hatası:", error);
+          reportWindow.alert("PDF açılamadı: " + (error?.message || String(error)));
         }
       });
     };
