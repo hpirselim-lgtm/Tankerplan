@@ -158,17 +158,17 @@ function createPlanReportHtml({ plan, plate, trailerPlate, vehicleType, eyes }) 
 </style>
 </head>
 <body style="font-family:Arial,Helvetica,sans-serif;color:#17364d;font-size:11px;line-height:1.4;margin:0;padding:12px;">
-<header>
+<header style="border-bottom:2px solid #e11d2e;padding:0 0 8px;margin:0 0 10px;">
   <h1 style="margin:0 0 4px;font-size:24px;line-height:1.2;color:#102d45;">TankerPlan</h1>
-  <div class="subtitle">Akaryakıt Tankeri Yükleme Planı</div>
+  <div class="subtitle" style="margin-top:3px;color:#647684;font-size:11px;">Akaryakıt Tankeri Yükleme Planı</div>
 </header>
-<div class="meta"><strong>${escapeHtml(vehicleLabel)}</strong><span>Oluşturulma: ${escapeHtml(createdAt)}</span></div>
-<div class="summary">
-  <div>Toplam talep<b>${formatLiters(plan.totalDemand)} L</b></div>
-  <div>Yüklenecek<b>${formatLiters(plan.totalLoaded)} L</b></div>
-  <div>Karşılanamayan<b>${formatLiters(plan.unallocated)} L</b></div>
-  <div>Tahmini ürün ağırlığı<b>${formatLiters(Math.round(plan.totalMassKg))} kg</b></div>
-  <div>Toplam tanker kapasitesi<b>${formatLiters(eyes.reduce((sum, eye) => sum + eye.capacity, 0))} L</b></div>
+<div class="meta" style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;margin:8px 0;font-size:10px;"><strong>${escapeHtml(vehicleLabel)}</strong><span>Oluşturulma: ${escapeHtml(createdAt)}</span></div>
+<div class="summary" style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 12px;">
+  <div style="flex:1 1 30%;min-width:0;background:#edf2f5;border:1px solid #cbd6de;border-radius:4px;padding:7px;font-size:9px;">Toplam talep<b style="display:block;font-size:12px;margin-top:3px;color:#102d45;">${formatLiters(plan.totalDemand)} L</b></div>
+  <div style="flex:1 1 30%;min-width:0;background:#edf2f5;border:1px solid #cbd6de;border-radius:4px;padding:7px;font-size:9px;">Yüklenecek<b style="display:block;font-size:12px;margin-top:3px;color:#102d45;">${formatLiters(plan.totalLoaded)} L</b></div>
+  <div style="flex:1 1 30%;min-width:0;background:#edf2f5;border:1px solid #cbd6de;border-radius:4px;padding:7px;font-size:9px;">Karşılanamayan<b style="display:block;font-size:12px;margin-top:3px;color:#102d45;">${formatLiters(plan.unallocated)} L</b></div>
+  <div style="flex:1 1 30%;min-width:0;background:#edf2f5;border:1px solid #cbd6de;border-radius:4px;padding:7px;font-size:9px;">Tahmini ürün ağırlığı<b style="display:block;font-size:12px;margin-top:3px;color:#102d45;">${formatLiters(Math.round(plan.totalMassKg))} kg</b></div>
+  <div style="flex:1 1 30%;min-width:0;background:#edf2f5;border:1px solid #cbd6de;border-radius:4px;padding:7px;font-size:9px;">Toplam tanker kapasitesi<b style="display:block;font-size:12px;margin-top:3px;color:#102d45;">${formatLiters(eyes.reduce((sum, eye) => sum + eye.capacity, 0))} L</b></div>
 </div>
 <h2 style="font-size:16px;margin:14px 0 7px;color:#102d45;">Göz Bazında Yükleme Listesi</h2>
 <table style="width:100%;border-collapse:collapse;table-layout:fixed;margin:0 0 12px;">
@@ -180,10 +180,10 @@ function createPlanReportHtml({ plan, plate, trailerPlate, vehicleType, eyes }) 
 <thead><tr><th style="background:#102d45;color:#ffffff;text-align:left;font-size:10px;font-weight:700;border:1px solid #8999a5;padding:7px 6px;vertical-align:middle;width:28%">Dağıtım şirketi / Bayi</th><th style="background:#102d45;color:#ffffff;text-align:left;font-size:10px;font-weight:700;border:1px solid #8999a5;padding:7px 6px;vertical-align:middle;width:36%">Ürün</th><th style="background:#102d45;color:#ffffff;text-align:left;font-size:10px;font-weight:700;border:1px solid #8999a5;padding:7px 6px;vertical-align:middle;width:18%">Talep</th><th style="background:#102d45;color:#ffffff;text-align:left;font-size:10px;font-weight:700;border:1px solid #8999a5;padding:7px 6px;vertical-align:middle;width:18%">Eksik</th></tr></thead>
 <tbody>${taskRows || '<tr><td colspan="4">Talep bulunamadı.</td></tr>'}</tbody>
 </table>
-<div class="warning"><strong>Boş kalan gözler:</strong> ${escapeHtml(emptyEyes)}</div>
-${plan.unallocated > 0 ? `<div class="warning"><strong>Uyarı:</strong> ${formatLiters(plan.unallocated)} L ürün talebi karşılanamadı.</div>` : ""}
-<p class="note">Kesafet değerleri yaklaşık varsayılandır; ağırlık hesabı tahminidir. Gerçek sevkiyat için analiz belgesi veya ölçüm sertifikasındaki değer esas alınmalıdır. Bu rapor yükleme planlama amacıyla hazırlanmıştır; gerçek yükleme ve araç ağırlık kontrollerinin yerini almaz.</p>
-<footer>TANKERPLAN · Tasarım ve Geliştirme: Halim Pirselimoğlu</footer>
+<div class="warning" style="background:#fff5e8;border:1px solid #e5c28e;padding:8px 9px;border-radius:4px;margin-top:7px;font-size:10px;"><strong>Boş kalan gözler:</strong> ${escapeHtml(emptyEyes)}</div>
+${plan.unallocated > 0 ? `<div class="warning" style="background:#fff5e8;border:1px solid #e5c28e;padding:8px 9px;border-radius:4px;margin-top:7px;font-size:10px;"><strong>Uyarı:</strong> ${formatLiters(plan.unallocated)} L ürün talebi karşılanamadı.</div>` : ""}
+<p class="note" style="color:#526675;font-size:9px;line-height:1.4;margin:9px 0 0;">Kesafet değerleri yaklaşık varsayılandır; ağırlık hesabı tahminidir. Gerçek sevkiyat için analiz belgesi veya ölçüm sertifikasındaki değer esas alınmalıdır. Bu rapor yükleme planlama amacıyla hazırlanmıştır; gerçek yükleme ve araç ağırlık kontrollerinin yerini almaz.</p>
+<footer style="border-top:1px solid #b9c5cd;padding-top:7px;margin-top:9px;color:#647684;font-size:9px;">TANKERPLAN · Tasarım ve Geliştirme: Halim Pirselimoğlu</footer>
 </body>
 </html>`;
 }
