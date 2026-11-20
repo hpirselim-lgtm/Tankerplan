@@ -91,20 +91,20 @@ function createPlanReportHtml({ plan, plate, trailerPlate, vehicleType, eyes }) 
 
   const allocationRows = plan.allocations.map((item) => `
     <tr>
-      <td class="center">${item.eyeNumber}. Göz</td>
-      <td>${escapeHtml(item.company)}<small>${escapeHtml(item.dealer)}</small></td>
-      <td>${escapeHtml(item.product)}</td>
-      <td class="number">${formatLiters(item.loaded)} L<small>/ ${formatLiters(item.capacity)} L kapasite</small></td>
-      <td class="number">${Number(item.densityKgPerL).toLocaleString("tr-TR")} kg/L</td>
-      <td class="number">${formatLiters(Math.round(item.loaded * item.densityKgPerL))} kg</td>
+      <td style="text-align:center;font-size:10px;border:1px solid #8999a5;padding:7px 6px;vertical-align:middle;overflow-wrap:anywhere;">${item.eyeNumber}. Göz</td>
+      <td style="font-size:10px;border:1px solid #8999a5;padding:7px 6px;vertical-align:middle;overflow-wrap:anywhere;">${escapeHtml(item.company)}<small style="display:block;margin-top:3px;color:#526675;font-size:9px;line-height:1.35;">${escapeHtml(item.dealer)}</small></td>
+      <td style="font-size:10px;border:1px solid #8999a5;padding:7px 6px;vertical-align:middle;overflow-wrap:anywhere;">${escapeHtml(item.product)}</td>
+      <td style="text-align:right;font-size:10px;border:1px solid #8999a5;padding:7px 6px;vertical-align:middle;overflow-wrap:anywhere;font-variant-numeric:tabular-nums;">${formatLiters(item.loaded)} L<small style="display:block;margin-top:3px;color:#526675;font-size:9px;line-height:1.35;">/ ${formatLiters(item.capacity)} L kapasite</small></td>
+      <td style="text-align:right;font-size:10px;border:1px solid #8999a5;padding:7px 6px;vertical-align:middle;overflow-wrap:anywhere;font-variant-numeric:tabular-nums;">${Number(item.densityKgPerL).toLocaleString("tr-TR")} kg/L</td>
+      <td style="text-align:right;font-size:10px;border:1px solid #8999a5;padding:7px 6px;vertical-align:middle;overflow-wrap:anywhere;font-variant-numeric:tabular-nums;">${formatLiters(Math.round(item.loaded * item.densityKgPerL))} kg</td>
     </tr>`).join("");
 
   const taskRows = plan.tasks.map((task) => `
     <tr>
-      <td>${escapeHtml(task.company)}<small>${escapeHtml(task.dealer)}</small></td>
-      <td>${escapeHtml(task.product)}</td>
-      <td class="number">${formatLiters(task.demand)} L</td>
-      <td class="number">${formatLiters(task.remaining)} L</td>
+      <td style="font-size:10px;border:1px solid #8999a5;padding:7px 6px;vertical-align:middle;overflow-wrap:anywhere;">${escapeHtml(task.company)}<small style="display:block;margin-top:3px;color:#526675;font-size:9px;line-height:1.35;">${escapeHtml(task.dealer)}</small></td>
+      <td style="font-size:10px;border:1px solid #8999a5;padding:7px 6px;vertical-align:middle;overflow-wrap:anywhere;">${escapeHtml(task.product)}</td>
+      <td style="text-align:right;font-size:10px;border:1px solid #8999a5;padding:7px 6px;vertical-align:middle;overflow-wrap:anywhere;font-variant-numeric:tabular-nums;">${formatLiters(task.demand)} L</td>
+      <td style="text-align:right;font-size:10px;border:1px solid #8999a5;padding:7px 6px;vertical-align:middle;overflow-wrap:anywhere;font-variant-numeric:tabular-nums;">${formatLiters(task.remaining)} L</td>
     </tr>`).join("");
 
   const emptyEyes = plan.emptyEyes.length
@@ -157,9 +157,9 @@ function createPlanReportHtml({ plan, plate, trailerPlate, vehicleType, eyes }) 
   }
 </style>
 </head>
-<body>
+<body style="font-family:Arial,Helvetica,sans-serif;color:#17364d;font-size:11px;line-height:1.4;margin:0;padding:12px;">
 <header>
-  <h1>TankerPlan</h1>
+  <h1 style="margin:0 0 4px;font-size:24px;line-height:1.2;color:#102d45;">TankerPlan</h1>
   <div class="subtitle">Akaryakıt Tankeri Yükleme Planı</div>
 </header>
 <div class="meta"><strong>${escapeHtml(vehicleLabel)}</strong><span>Oluşturulma: ${escapeHtml(createdAt)}</span></div>
@@ -170,14 +170,14 @@ function createPlanReportHtml({ plan, plate, trailerPlate, vehicleType, eyes }) 
   <div>Tahmini ürün ağırlığı<b>${formatLiters(Math.round(plan.totalMassKg))} kg</b></div>
   <div>Toplam tanker kapasitesi<b>${formatLiters(eyes.reduce((sum, eye) => sum + eye.capacity, 0))} L</b></div>
 </div>
-<h2>Göz Bazında Yükleme Listesi</h2>
-<table>
-<thead><tr><th style="width:12%">Göz</th><th style="width:23%">Dağıtım şirketi / Bayi</th><th style="width:25%">Ürün</th><th style="width:17%">Yükleme / Kapasite</th><th style="width:11%">Kesafet</th><th style="width:12%">Ağırlık</th></tr></thead>
+<h2 style="font-size:16px;margin:14px 0 7px;color:#102d45;">Göz Bazında Yükleme Listesi</h2>
+<table style="width:100%;border-collapse:collapse;table-layout:fixed;margin:0 0 12px;">
+<thead><tr><th style="background:#102d45;color:#ffffff;text-align:left;font-size:10px;font-weight:700;border:1px solid #8999a5;padding:7px 6px;vertical-align:middle;width:12%">Göz</th><th style="background:#102d45;color:#ffffff;text-align:left;font-size:10px;font-weight:700;border:1px solid #8999a5;padding:7px 6px;vertical-align:middle;width:23%">Dağıtım şirketi / Bayi</th><th style="background:#102d45;color:#ffffff;text-align:left;font-size:10px;font-weight:700;border:1px solid #8999a5;padding:7px 6px;vertical-align:middle;width:25%">Ürün</th><th style="background:#102d45;color:#ffffff;text-align:left;font-size:10px;font-weight:700;border:1px solid #8999a5;padding:7px 6px;vertical-align:middle;width:17%">Yükleme / Kapasite</th><th style="background:#102d45;color:#ffffff;text-align:left;font-size:10px;font-weight:700;border:1px solid #8999a5;padding:7px 6px;vertical-align:middle;width:11%">Kesafet</th><th style="background:#102d45;color:#ffffff;text-align:left;font-size:10px;font-weight:700;border:1px solid #8999a5;padding:7px 6px;vertical-align:middle;width:12%">Ağırlık</th></tr></thead>
 <tbody>${allocationRows || '<tr><td colspan="6">Yükleme bulunamadı.</td></tr>'}</tbody>
 </table>
-<h2>Ürün Talep Özeti</h2>
-<table>
-<thead><tr><th style="width:28%">Dağıtım şirketi / Bayi</th><th style="width:36%">Ürün</th><th style="width:18%">Talep</th><th style="width:18%">Eksik</th></tr></thead>
+<h2 style="font-size:16px;margin:14px 0 7px;color:#102d45;">Ürün Talep Özeti</h2>
+<table style="width:100%;border-collapse:collapse;table-layout:fixed;margin:0 0 12px;">
+<thead><tr><th style="background:#102d45;color:#ffffff;text-align:left;font-size:10px;font-weight:700;border:1px solid #8999a5;padding:7px 6px;vertical-align:middle;width:28%">Dağıtım şirketi / Bayi</th><th style="background:#102d45;color:#ffffff;text-align:left;font-size:10px;font-weight:700;border:1px solid #8999a5;padding:7px 6px;vertical-align:middle;width:36%">Ürün</th><th style="background:#102d45;color:#ffffff;text-align:left;font-size:10px;font-weight:700;border:1px solid #8999a5;padding:7px 6px;vertical-align:middle;width:18%">Talep</th><th style="background:#102d45;color:#ffffff;text-align:left;font-size:10px;font-weight:700;border:1px solid #8999a5;padding:7px 6px;vertical-align:middle;width:18%">Eksik</th></tr></thead>
 <tbody>${taskRows || '<tr><td colspan="4">Talep bulunamadı.</td></tr>'}</tbody>
 </table>
 <div class="warning"><strong>Boş kalan gözler:</strong> ${escapeHtml(emptyEyes)}</div>
