@@ -1192,7 +1192,11 @@ async function deleteVehicle(vehicle) {
 
     const reportWindow = window.open("", "_blank");
     if (!reportWindow) {
-      window.alert("Rapor açılamadı. Açılır pencerelere izin verip tekrar deneyin.");
+      // iPhone Safari/Chrome açılır pencereyi engellerse raporu aynı sekmede aç.
+      // Böylece yazdırma akışı popup iznine bağlı kalmaz; geri tuşuyla uygulamaya dönülebilir.
+      const reportBlob = new Blob([html], { type: "text/html;charset=utf-8" });
+      const reportUrl = URL.createObjectURL(reportBlob);
+      window.location.assign(reportUrl);
       return;
     }
 
