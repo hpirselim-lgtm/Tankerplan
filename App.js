@@ -639,8 +639,17 @@ export default function App() {
     loadVehicles();
     loadLoadingHistory();
 
-    // iPhone Safari'de klavye açıldığında yatay taşmayı engelle.
+    // Mobil tarayıcılarda klavye açılınca görünür alanı yeniden boyutlandır
+    // ve odaklanan giriş kutusunu klavyenin üstünde tut.
     if (Platform.OS === "web" && typeof document !== "undefined") {
+      const viewport = document.querySelector('meta[name="viewport"]');
+      if (viewport) {
+        viewport.setAttribute(
+          "content",
+          "width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, interactive-widget=resizes-content"
+        );
+      }
+
       const styleId = "tankerplan-mobile-viewport-fix";
       if (!document.getElementById(styleId)) {
         const style = document.createElement("style");
@@ -649,14 +658,32 @@ export default function App() {
           html, body, #root {
             width: 100% !important;
             max-width: 100% !important;
+            min-height: 100%;
             overflow-x: hidden !important;
+          }
+          #root {
+            height: 100dvh !important;
           }
           *, *::before, *::after {
             box-sizing: border-box;
           }
+          input, textarea, select {
+            scroll-margin-top: 24px;
+            scroll-margin-bottom: 180px;
+          }
         `;
         document.head.appendChild(style);
       }
+
+      const keepFocusedInputVisible = (event) => {
+        const target = event.target;
+        if (!target || !target.matches || !target.matches("input, textarea, select")) return;
+        window.setTimeout(() => {
+          target.scrollIntoView({ block: "center", inline: "nearest", behavior: "smooth" });
+        }, 300);
+      };
+      document.addEventListener("focusin", keepFocusedInputVisible);
+      return () => document.removeEventListener("focusin", keepFocusedInputVisible);
     }
   }, []);
 
@@ -1312,7 +1339,7 @@ async function deleteVehicle(vehicle) {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.container}>
+      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" automaticallyAdjustKeyboardInsets>
         <View style={styles.header}>
           <View style={styles.brandRow}>
             <View style={styles.brandMark}>
