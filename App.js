@@ -759,8 +759,39 @@ export default function App() {
       eyes: record.eyes,
     });
     if (Platform.OS === "web") {
-      // Geçmiş raporu da yeni yükleme raporuyla aynı yazdırma akışını kullanır.
-      openWebPlanReport(html);
+      // iPhone tarayıcılarında Blob raporundaki window.print() yanıt vermeyebiliyor.
+      // Geçmiş kaydını uygulama sayfasında html2pdf ile doğrudan PDF'e dönüştür.
+      const frame = document.createElement("iframe");
+      frame.style.position = "fixed";
+      frame.style.left = "-10000px";
+      frame.style.top = "0";
+      frame.style.width = "794px";
+      frame.style.height = "1123px";
+      frame.style.border = "0";
+      frame.setAttribute("aria-hidden", "true");
+      document.body.appendChild(frame);
+      frame.onload = async () => {
+        try {
+          const fileName = `TankerPlan-${normalizePlate(record.plate || "Yukleme") || "Yukleme"}-${new Date(record.createdAt || Date.now()).toISOString().slice(0,10)}.pdf`;
+          await html2pdf()
+            .set({
+              margin: [8, 8, 8, 8],
+              filename: fileName,
+              image: { type: "jpeg", quality: 0.98 },
+              html2canvas: { scale: 2, useCORS: true, scrollY: 0 },
+              jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+              pagebreak: { mode: ["css", "legacy"] },
+            })
+            .from(frame.contentDocument.body)
+            .save();
+        } catch (error) {
+          console.error("Geçmiş PDF oluşturma hatası:", error);
+          window.alert("PDF oluşturulamadı. Lütfen tekrar deneyin.");
+        } finally {
+          frame.remove();
+        }
+      };
+      frame.srcdoc = html;
       return;
     }
     try {
