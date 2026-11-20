@@ -1190,10 +1190,36 @@ async function deleteVehicle(vehicle) {
     </style>`);
     html = html.replace(/<body[^>]*>/i, (match) => match + toolbar);
 
+    // Yazdırma olayını HTML'in içine koy: hem yeni sekmede hem de iPhone
+    // popup engellediğinde açılan aynı-sekme Blob raporunda çalışır.
+    const printScript = `
+      <script>
+        (function () {
+          document.addEventListener("click", function (event) {
+            var target = event.target && event.target.nodeType === 3
+              ? event.target.parentElement
+              : event.target;
+            var button = target && target.closest
+              ? target.closest("#tankerplan-pdf-button")
+              : null;
+            if (!button) return;
+            event.preventDefault();
+            var reportToolbar = document.querySelector(".web-report-toolbar");
+            if (reportToolbar) reportToolbar.style.display = "none";
+            window.focus();
+            window.setTimeout(function () { window.print(); }, 150);
+            window.addEventListener("afterprint", function () {
+              if (reportToolbar) reportToolbar.style.display = "flex";
+            }, { once: true });
+          }, true);
+        })();
+      </script>`;
+    html = html.replace(/<\/body>/i, printScript + "</body>");
+
     const reportWindow = window.open("", "_blank");
     if (!reportWindow) {
       // iPhone Safari/Chrome açılır pencereyi engellerse raporu aynı sekmede aç.
-      // Böylece yazdırma akışı popup iznine bağlı kalmaz; geri tuşuyla uygulamaya dönülebilir.
+      // Yazdırma kodu HTML'in içinde olduğu için bu ekranda da çalışır.
       const reportBlob = new Blob([html], { type: "text/html;charset=utf-8" });
       const reportUrl = URL.createObjectURL(reportBlob);
       window.location.assign(reportUrl);
@@ -1203,22 +1229,6 @@ async function deleteVehicle(vehicle) {
     reportWindow.document.open();
     reportWindow.document.write(html);
     reportWindow.document.close();
-
-    // Tarayıcının kendi yazdırma motoru HTML tablolarını korur.
-    reportWindow.document.addEventListener("click", (event) => {
-      const target = event.target && event.target.nodeType === 3
-        ? event.target.parentElement
-        : event.target;
-      const button = target && target.closest
-        ? target.closest("#tankerplan-pdf-button")
-        : null;
-      if (!button) return;
-      event.preventDefault();
-      const reportToolbar = reportWindow.document.querySelector(".web-report-toolbar");
-      if (reportToolbar) reportToolbar.style.display = "none";
-      reportWindow.focus();
-      reportWindow.print();
-    }, true);
   }
 
   async function savePlanPdf() {
