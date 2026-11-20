@@ -118,7 +118,7 @@ function createPlanReportHtml({ plan, plate, trailerPlate, vehicleType, eyes }) 
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>TankerPlan Yükleme Planı - ${escapeHtml(plate || "Araç")}</title>
 <style>
-  @page { size: A4 portrait; margin: 10mm; }
+  @page { size: A4 landscape; margin: 8mm; }
   * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   html, body { width: 100%; min-height: 0; margin: 0; padding: 0; }
   body { font-family: Arial, Helvetica, sans-serif; color: #17364d; font-size: 11px; line-height: 1.4; }
@@ -146,7 +146,7 @@ function createPlanReportHtml({ plan, plate, trailerPlate, vehicleType, eyes }) 
     body { padding: 18px; max-width: 900px; margin: 0 auto; }
   }
   @media print {
-    @page { size: A4 portrait; margin: 9mm; }
+    @page { size: A4 landscape; margin: 8mm; }
     html, body { width: auto !important; height: auto !important; min-height: 0 !important; margin: 0 !important; padding: 0 !important; }
     body { font-size: 10px; }
     header, .meta, .summary, h2, .warning, .note, footer { break-inside: avoid; page-break-inside: avoid; }
@@ -765,8 +765,8 @@ export default function App() {
       frame.style.position = "fixed";
       frame.style.left = "-10000px";
       frame.style.top = "0";
-      frame.style.width = "794px";
-      frame.style.height = "1123px";
+      frame.style.width = "1123px";
+      frame.style.height = "794px";
       frame.style.border = "0";
       frame.setAttribute("aria-hidden", "true");
       document.body.appendChild(frame);
@@ -779,10 +779,10 @@ export default function App() {
               filename: fileName,
               image: { type: "jpeg", quality: 0.98 },
               html2canvas: { scale: 2, useCORS: true, scrollY: 0 },
-              jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+              jsPDF: { unit: "mm", format: "a4", orientation: "landscape" },
               pagebreak: { mode: ["css", "legacy"] },
             })
-            .from(frame.contentDocument.body)
+            .from(frame.contentDocument.documentElement)
             .save();
         } catch (error) {
           console.error("Geçmiş PDF oluşturma hatası:", error);
