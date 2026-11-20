@@ -148,7 +148,22 @@ function createPlanReportHtml({ plan, plate, trailerPlate, vehicleType, eyes }) 
   @media print {
     @page { size: A4 landscape; margin: 8mm; }
     html, body { width: auto !important; height: auto !important; min-height: 0 !important; margin: 0 !important; padding: 0 !important; }
-    body { font-size: 10px; }
+    body { font-size: 10px; color: #111 !important; }
+    /* Yazıcı çıktısında ince kalan metinleri daha koyu ve okunaklı yap. */
+    body, body p, body span, body div, body td, body small, body li {
+      color: #111 !important;
+      font-weight: 600 !important;
+      -webkit-text-stroke: .12px currentColor;
+    }
+    body th, body strong, body b, body h1, body h2, body h3 {
+      color: #102d45 !important;
+      font-weight: 800 !important;
+      -webkit-text-stroke: .18px currentColor;
+    }
+    body td small, body .subtitle, body .note, body footer {
+      color: #333 !important;
+      font-weight: 500 !important;
+    }
     header, .meta, .summary, h2, .warning, .note, footer { break-inside: avoid; page-break-inside: avoid; }
     table { width: 100% !important; break-inside: auto; page-break-inside: auto; }
     thead { display: table-header-group !important; }
@@ -1241,6 +1256,19 @@ async function deleteVehicle(vehicle) {
       @media print {
         .web-report-toolbar { display: none !important; }
         html, body { width: 100% !important; margin: 0 !important; padding: 0 !important; }
+        body, body p, body span, body div, body td, body small, body li {
+          color: #111 !important;
+          font-weight: 600 !important;
+          -webkit-text-stroke: .12px currentColor;
+        }
+        body th, body strong, body b, body h1, body h2, body h3 {
+          font-weight: 800 !important;
+          -webkit-text-stroke: .18px currentColor;
+        }
+        body td small, body .subtitle, body .note, body footer {
+          color: #333 !important;
+          font-weight: 500 !important;
+        }
         table { display: table !important; width: 100% !important; }
         thead { display: table-header-group !important; }
         tr { break-inside: avoid !important; page-break-inside: avoid !important; }
